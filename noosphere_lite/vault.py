@@ -45,6 +45,28 @@ def _stamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _utc_instant(value: str | None) -> str | None:
+    """Normalize ISO 8601 instants to UTC; never infer dates or timezones."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise VaultError("timestamp must be a nonempty offset-aware ISO 8601 string")
+    try:
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise VaultError("invalid ISO 8601 timestamp") from exc
+    if stamp.tzinfo is None or stamp.utcoffset() is None:
+        raise VaultError("timestamp needs an explicit timezone/UTC offset")
+    return stamp.astimezone(timezone.utc).isoformat()
+
+
+def _bounds(start: str | None, end: str | None) -> tuple[str | None, str | None]:
+    start, end = _utc_instant(start), _utc_instant(end)
+    if start and end and datetime.fromisoformat(end) <= datetime.fromisoformat(start):
+        raise VaultError("valid_to must be later than valid_from")
+    return start, end
+
+
 def _words(value: str) -> set[str]:
     return set(re.findall(r"\w{2,}", value.casefold(), re.UNICODE))
 
@@ -177,12 +199,13 @@ class MemoryVault:
             nodes[data["id"]] = data
         elif op == "link":
             key = (event["from"], event["to"], event["relation"])
-            links[key] = True
+            links[key] = event.get("at")
         elif op == "unlink":
             links.pop((event["from"], event["to"], event["relation"]), None)
         elif op == "archive":
             if event["id"] in nodes:
-                nodes[event["id"]] = {**nodes[event["id"]], "archived": True}
+                nodes[event["id"]] = {**nodes[event["id"]], "archived": True,
+                                      "archived_at": event.get("at")}
         elif op == "mark_stale":
             for memory_id in event["ids"]:
                 if memory_id in nodes:
@@ -297,16 +320,22 @@ class MemoryVault:
             return self._reconcile(self._key())
 
     def add(self, title: str, body: str, tags: list[str] | None = None,
-            kind: str = "note", source: str = "") -> dict:
+            kind: str = "note", source: str = "", *,
+            valid_from: str | None = None, valid_to: str | None = None,
+            observed_at: str | None = None) -> dict:
         if not 1 <= len(title.strip()) <= 256 or len(body) > 48_000:
             raise VaultError("invalid title/body size")
         tags = tags or []
         if len(tags) > 32 or any(len(x) > 64 for x in tags):
             raise VaultError("invalid tags")
+        start, end = _bounds(valid_from, valid_to)
+        observed = _utc_instant(observed_at)
         when = _stamp()
         node = dict(id=uuid.uuid4().hex, title=title.strip(), body=body,
                     tags=tags, kind=kind[:32], source=source[:500],
-                    created=when, updated=when, archived=False, status="current")
+                    created=when, updated=when, recorded_at=when,
+                    observed_at=observed, valid_from=start, valid_to=end,
+                    archived=False, status="current")
         self._append(dict(op="put", node=node))
         return dict(id=node["id"], title=node["title"], created=when)
 
@@ -317,15 +346,27 @@ class MemoryVault:
             raise VaultError("memory not found")
         return dict(node)
 
-    def search(self, query: str, limit: int = 10) -> list[dict]:
+    def search(self, query: str, limit: int = 10,
+               as_of: str | None = None) -> list[dict]:
         if not 1 <= len(query.strip()) <= 300:
             raise VaultError("query length must be 1..300")
+        moment = _utc_instant(as_of)
+        moment_dt = datetime.fromisoformat(moment) if moment else None
         terms = _words(query)
         needle = query.casefold().strip()
         scored = []
         for node in self._snapshot().nodes.values():
             if node.get("archived"):
                 continue
+            if moment is not None:
+                start, end = node.get("valid_from"), node.get("valid_to")
+                # Unknown historical validity must not be presented as proven.
+                if start is None and end is None:
+                    continue
+                if start is not None and moment_dt < datetime.fromisoformat(start):
+                    continue
+                if end is not None and moment_dt >= datetime.fromisoformat(end):
+                    continue
             title = node["title"].casefold()
             tags = " ".join(node["tags"]).casefold()
             body = node["body"].casefold()
@@ -338,6 +379,8 @@ class MemoryVault:
         scored.sort(key=lambda x: (-x[0], x[1]["id"]))
         return [dict(id=n["id"], title=n["title"], tags=n["tags"], kind=n["kind"],
                      snippet=n["body"][:220], status=n.get("status", "current"),
+                     recorded_at=n.get("recorded_at", n.get("created")),
+                     valid_from=n.get("valid_from"), valid_to=n.get("valid_to"),
                      score=s) for s,n in scored[:max(1, min(limit,50))]]
 
     def suggest_links(self, memory_id: str, limit: int = 10) -> list[dict]:
@@ -352,11 +395,13 @@ class MemoryVault:
     def link(self, from_id: str, to_id: str, relation: str = "related") -> dict:
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", relation):
             raise VaultError("invalid relation")
-        self._append(dict(op="link", **{"from":from_id, "to":to_id, "relation":relation}))
+        self._append(dict(op="link", at=_stamp(),
+                          **{"from":from_id, "to":to_id, "relation":relation}))
         return {"linked": True, "from": from_id, "to": to_id, "relation": relation}
 
     def unlink(self, from_id: str, to_id: str, relation: str = "related") -> dict:
-        self._append(dict(op="unlink", **{"from":from_id, "to":to_id, "relation":relation}))
+        self._append(dict(op="unlink", at=_stamp(),
+                          **{"from":from_id, "to":to_id, "relation":relation}))
         return {"unlinked": True}
 
     def neighbors(self, memory_id: str, depth: int = 1, limit: int = 100) -> dict:
@@ -373,7 +418,8 @@ class MemoryVault:
                 neighbor = b if a == n else a
                 if state.nodes.get(neighbor, {}).get("archived"):
                     continue
-                edges.append({"from": a, "to": b, "relation": rel})
+                edges.append({"from": a, "to": b, "relation": rel,
+                              "recorded_at": state.links[(a, b, rel)]})
                 if neighbor not in discovered and len(discovered) < max(1, min(limit, 200)):
                     discovered.add(neighbor)
                     queue.append((neighbor, distance+1))
@@ -433,7 +479,9 @@ class MemoryVault:
         self._append(make_event)
         return {"stale_count": len(result["stale_ids"]), **result}
 
-    def revise(self, memory_id: str, body: str, title: str | None = None) -> dict:
+    def revise(self, memory_id: str, body: str, title: str | None = None,
+               *, valid_from: str | None = None,
+               valid_to: str | None = None) -> dict:
         """Update a source record and automatically stale downstream derived memories."""
         if not isinstance(body, str) or len(body) > 48_000:
             raise VaultError("invalid body")
@@ -446,6 +494,10 @@ class MemoryVault:
                 raise VaultError("memory not found")
             at = _stamp()
             updated = dict(old, body=body, updated=at, status="current")
+            if valid_from is not None or valid_to is not None:
+                start = valid_from if valid_from is not None else old.get("valid_from")
+                end = valid_to if valid_to is not None else old.get("valid_to")
+                updated["valid_from"], updated["valid_to"] = _bounds(start, end)
             updated.pop("stale_reason", None)
             updated.pop("stale_at", None)
             if title is not None:
@@ -459,7 +511,7 @@ class MemoryVault:
 
     def archive(self, memory_id: str) -> dict:
         self.read(memory_id)
-        self._append(dict(op="archive", id=memory_id))
+        self._append(dict(op="archive", id=memory_id, at=_stamp()))
         return {"archived": True, "warning": "archived records remain in encrypted event history"}
 
     def status(self) -> dict:
