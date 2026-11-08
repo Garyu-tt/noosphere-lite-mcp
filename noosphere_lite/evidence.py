@@ -11,7 +11,7 @@ import json
 import re
 from datetime import datetime, timezone
 
-from .vault import MemoryVault, VaultError, _utc_instant
+from .vault import MemoryVault, VaultError, _utc_instant, _INTERNAL_WRITER
 
 _KEY = re.compile(r"[a-zA-Z0-9_.:-]{1,120}\Z")
 _SCOPE = re.compile(r"[a-zA-Z0-9_.:-]{1,48}\Z")
@@ -73,7 +73,8 @@ class EvidenceGate:
         except (ValueError, TypeError) as exc:
             raise VaultError("invalid JSON evidence source") from exc
         result = self.vault.add(title, normalized, kind="evidence_source",
-                                tags=["evidence", scope], observed_at=observed_at)
+                                tags=["evidence", scope], observed_at=observed_at,
+                                _internal_writer=_INTERNAL_WRITER)
         return {**result, "sha256": hashlib.sha256(normalized.encode("utf-8")).hexdigest()}
 
     def propose(self, fact_key: str, source_id: str, pointer: str, *,
@@ -110,7 +111,8 @@ class EvidenceGate:
                      stale_after=stale_after, publication_approved=False)
         result = self.vault.add(fact_key, _canonical(claim), kind="evidence_claim",
                                 tags=["evidence", scope], valid_from=valid_from,
-                                valid_to=valid_to)
+                                valid_to=valid_to,
+                                _internal_writer=_INTERNAL_WRITER)
         self.vault.link(result["id"], source_id, "derived_from")
         return {**result, "status": "source_matched_unreviewed",
                 "warning": "matching source bytes does not establish real-world truth"}
@@ -133,7 +135,8 @@ class EvidenceGate:
         # Write the durable tombstone FIRST. If invalidation fails, reads still
         # exclude the rejected value; no false resurrection after interruption.
         item = self.vault.add("Rejected: " + claim["fact_key"], _canonical(tomb),
-                              kind="evidence_tombstone", tags=["evidence", claim["scope"]])
+                              kind="evidence_tombstone", tags=["evidence", claim["scope"]],
+                              _internal_writer=_INTERNAL_WRITER)
         self.vault.invalidate(claim_id, reason.strip())
         return {"rejected": True, "tombstone_id": item["id"]}
 

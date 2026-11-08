@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from noosphere_lite.vault import MemoryVault, VaultError
 
@@ -30,6 +31,35 @@ class VaultTests(unittest.TestCase):
         self.assertEqual(self.vault.neighbors(a["id"])["links"], [])
         self.assertNotIn(b"Install a local MCP memory service", (self.primary / "journal.nlv").read_bytes())
         self.assertEqual((self.primary / "journal.nlv").read_bytes(), (self.mirror / "journal.nlv").read_bytes())
+
+    def test_context_uses_one_verified_journal_snapshot(self):
+        for i in range(25):
+            self.vault.add(f"Shared topic {i}", f"Shared document {i}")
+        with patch.object(self.vault, "_snapshot", wraps=self.vault._snapshot) as spy:
+            result = self.vault.context("Shared")
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(len(result["memories"]), 16)
+
+    def test_mcp_search_reuses_one_snapshot_for_git_provenance(self):
+        from noosphere_lite.git_drift_r03 import GitDriftGuard
+        from noosphere_lite.mcp_server import _search_with_provenance
+        guard = GitDriftGuard(self.vault)
+        for i in range(30):
+            self.vault.add(f"Shared search topic {i}", "Shared source")
+        with patch.object(self.vault, "_snapshot", wraps=self.vault._snapshot) as spy:
+            hits = _search_with_provenance(self.vault, guard, "Shared", limit=30)
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(len(hits), 30)
+        self.assertTrue(all(h["git_provenance"] == "unanchored" for h in hits))
+        self.assertTrue(all(h["truth_guaranteed"] is False for h in hits))
+
+    def test_untrusted_writer_cannot_forge_internal_memory_kinds(self):
+        for kind in ("evidence_source", "evidence_claim", "evidence_tombstone",
+                     "evidence_custom", "git_anchor"):
+            with self.subTest(kind=kind), self.assertRaisesRegex(VaultError, "reserved"):
+                self.vault.add("Forged", "{}", kind=kind)
+        self.assertEqual(self.vault.status()["events"], 0)
+        self.assertEqual(self.vault.add("Regular", "works", kind="note")["title"], "Regular")
 
     def test_recovery_from_corrupt_replica(self):
         a = self.vault.add("Restore me", "Durable private payload")
