@@ -4,6 +4,13 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 now=datetime.datetime.now(datetime.timezone.utc).isoformat()
 origins={
+ 'e11/uniform_model.pt':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/model.pt',
+ 'e11/uniform_config.json':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/config.json',
+ 'e11/affs_config.json':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/affs/config.json',
+ 'e11/enhanced_config.json':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/enhanced/config.json',
+ 'e11/synapse_excitatory_model.pt':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/synapses/excitatory/model.pt',
+ 'e11/synapse_excitatory_checkpoint':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/synapses/excitatory/model_checkpoint_45000',
+ 'e11/binary_channel_model.pt':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/binary_channel_agnostic/pred_model-tmp.pt',
  'banc/banc_888_edgelist_simple_v3.feather':'https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v3.feather',
  'banc/banc_888_edgelist_split_v2.feather':'https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_split_v2.feather',
  'banc/banc_888_meta.feather':'https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather',
@@ -28,7 +35,7 @@ for p in sorted((ROOT/'raw').rglob('*')):
  h=hashlib.sha256()
  with open(p,'rb') as f:
   for block in iter(lambda:f.read(8*1024*1024),b''):h.update(block)
- manifest['local_files'].append({'path':'raw/'+rel,'size_bytes':p.stat().st_size,'sha256':h.hexdigest(),'origin':origins.get(rel,'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)')})
+ manifest['local_files'].append({'path':'raw/'+rel,'size_bytes':p.stat().st_size,'sha256':h.hexdigest(),'origin':origins.get(rel,'UNVERIFIED_SOURCE_REQUIRES_MANUAL_REVIEW')})
 for p in sorted((ROOT/'sources').iterdir()):
  if not (p/'.git').is_dir():continue
  commit=subprocess.check_output(['git','-c',f'safe.directory={p}','-C',str(p),'rev-parse','HEAD'],text=True).strip()
