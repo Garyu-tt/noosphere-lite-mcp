@@ -2,6 +2,7 @@
 from .vault import MemoryVault
 from .evidence import EvidenceGate
 from .briefing import MemoryBriefings
+from .context_r02 import context as trust_context
 
 def run(vault: MemoryVault):
     try:
@@ -29,7 +30,11 @@ def run(vault: MemoryVault):
     def memory_search(query: str, limit: int = 10,
                       as_of: str | None = None) -> list[dict]:
         """Find memories, optionally filtering by explicitly known validity at an instant."""
-        return vault.search(query, limit, as_of=as_of)
+        hits = vault.search(query, limit, as_of=as_of)
+        for hit in hits:
+            hit["evidence_status"] = "unreviewed_legacy_memory"
+            hit["truth_guaranteed"] = False
+        return hits
 
     @app.tool()
     def memory_suggest_links(memory_id: str, limit: int = 10) -> list[dict]:
@@ -57,9 +62,21 @@ def run(vault: MemoryVault):
         return vault.neighbors(memory_id, depth, limit)
 
     @app.tool()
-    def memory_context(query: str, max_chars: int = 10000) -> dict:
-        """Bring relevant long-term memories into a bounded working context."""
-        return vault.context(query, max_chars)
+    def memory_context(query: str, max_chars: int = 10000,
+                       source_grounded_only: bool = False,
+                       scope: str = "default", as_of: str | None = None) -> dict:
+        """Legacy notes are explicitly unreviewed; strict evidence mode is opt-in."""
+        return trust_context(vault, evidence, query, max_chars,
+                             source_grounded_only=source_grounded_only,
+                             scope=scope, as_of=as_of)
+
+    @app.tool()
+    def memory_source_grounded_context(query: str, scope: str = "default",
+                                       as_of: str | None = None,
+                                       max_chars: int = 10000) -> dict:
+        """Strict source-matched context without unreviewed memories or inferred truth."""
+        return trust_context(vault, evidence, query, max_chars,
+                             source_grounded_only=True, scope=scope, as_of=as_of)
 
     @app.tool()
     def memory_revise(memory_id: str, body: str, title: str | None = None,

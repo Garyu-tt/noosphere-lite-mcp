@@ -198,3 +198,7 @@ Lite работает локально на Linux и не требует обл�
 ## License / Authorship
 
 Original project code in this release: **GNU GPL-3.0-or-later**. Copyright (C) 2026 [Garyu-tt](https://github.com/Garyu-tt). See [LICENSE](LICENSE) and [AUTHORS.md](AUTHORS.md). Previously published MIT-licensed versions retain their earlier permissions and existing contributors' acknowledgments.
+
+### Контекст с проверкой источника R02 (2026-11-08)
+
+Результаты обычного `memory_search` и `memory_context` явно помечаются как непроверенные заметки. Для контекста только с привязкой к исходному свидетельству используйте `memory_source_grounded_context` или `memory_context(..., source_grounded_only=true)`. Строгий режим не подмешивает старые записи; совпадение с источником не означает доказанную истинность. [Документация R02](docs/EVIDENCE_CONTEXT_R02.md).
