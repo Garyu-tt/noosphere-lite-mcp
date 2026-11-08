@@ -117,12 +117,14 @@ class BriefingTests(unittest.TestCase):
         self.assertEqual(self.reader.by_source("alpha","SRC/A.PY")["records"],[])
 
     def test_unavailable_path_is_never_opened(self):
-        before=list(self.root.rglob("*"))
         self.add("decision","Exact label only",source="/no/such/file/private.py")
+        # The vault itself creates an owner-only lock on the first append.
+        before={p.relative_to(self.root) for p in self.root.rglob("*")}
         r=self.reader.by_source("alpha","/no/such/file/private.py")
         self.assertEqual(r["matched"],1)
         self.assertFalse(r["source_verified"])
-        self.assertEqual(before,list(self.root.rglob("*"))[:len(before)])
+        after={p.relative_to(self.root) for p in self.root.rglob("*")}
+        self.assertEqual(before,after)
 
     def test_large_record_is_skipped_not_misleadingly_truncated(self):
         self.add("negative","X"*6000)
