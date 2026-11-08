@@ -92,6 +92,10 @@ Hosted ChatGPT use may require a separately supported MCP bridge; this local con
 | memory_archive | Hide without destroying encrypted history |
 | memory_status | Verify journals and counts |
 
+## Experimental reviewed graph weights (R04)
+
+The [reviewed_plasticity reference implementation](examples/reviewed_plasticity/README.md) demonstrates sparse link-utility weights, explicit independent QA attribution, SHA-256 evidence checks, idempotent feedback, and rollback. **It is not integrated into Lite MCP 0.3.0 or its encrypted NLV1 journal**, and does not change LLM model parameters. The optional SQLite sidecar is unencrypted and requires an authenticated host-side reviewer workflow before production use.
+
 ## What it does not do yet
 
 Search is lexical, not embeddings or semantic LLM retrieval. Dependencies must be explicitly linked; neither factual truth nor contradictory evidence is automatically verified. Automatic relevance aging, semantic retrieval, conflict resolution, history compaction, per-agent permissions and offsite backup integration are on the roadmap.
