@@ -358,6 +358,9 @@ class MemoryVault:
         for node in self._snapshot().nodes.values():
             if node.get("archived"):
                 continue
+            # Evidence claims and retractions must never bypass the evidence gate.
+            if str(node.get("kind", "")).startswith("evidence_"):
+                continue
             if moment is not None:
                 start, end = node.get("valid_from"), node.get("valid_to")
                 # Unknown historical validity must not be presented as proven.
@@ -492,6 +495,8 @@ class MemoryVault:
             old = state.nodes.get(memory_id)
             if not old or old.get("archived"):
                 raise VaultError("memory not found")
+            if old.get("kind") in ("evidence_claim", "evidence_tombstone"):
+                raise VaultError("evidence claims and rejection tombstones are immutable")
             at = _stamp()
             updated = dict(old, body=body, updated=at, status="current")
             if valid_from is not None or valid_to is not None:
@@ -510,7 +515,9 @@ class MemoryVault:
         return result
 
     def archive(self, memory_id: str) -> dict:
-        self.read(memory_id)
+        node = self.read(memory_id)
+        if node.get("kind") == "evidence_tombstone":
+            raise VaultError("rejection tombstones cannot be archived")
         self._append(dict(op="archive", id=memory_id, at=_stamp()))
         return {"archived": True, "warning": "archived records remain in encrypted event history"}
 
