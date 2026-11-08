@@ -1,0 +1,61 @@
+"""MCP stdio adapter; no network listener and no private Noosphere dependencies."""
+from .vault import MemoryVault
+
+def run(vault: MemoryVault):
+    try:
+        try:
+            from mcp.server.mcpserver import MCPServer as MCPApp  # MCP SDK 2.x
+        except ImportError:
+            from mcp.server.fastmcp import FastMCP as MCPApp  # MCP SDK 1.x
+    except ImportError as e:
+        raise RuntimeError("Install dependencies: pip install -e .") from e
+    app = MCPApp("noosphere-lite-mcp")
+
+    @app.tool()
+    def memory_add(title: str, body: str, tags: list[str] | None = None,
+                   kind: str = "note", source: str = "") -> dict:
+        """Persist a note, decision, task, or observation in the encrypted memory."""
+        return vault.add(title, body, tags, kind, source)
+
+    @app.tool()
+    def memory_search(query: str, limit: int = 10) -> list[dict]:
+        """Find relevant memories; use memory_read for payload."""
+        return vault.search(query, limit)
+
+    @app.tool()
+    def memory_read(memory_id: str) -> dict:
+        """Retrieve one specific memory's complete content."""
+        return vault.read(memory_id)
+
+    @app.tool()
+    def memory_link(source_id: str, target_id: str, relation: str = "related") -> dict:
+        """Add a typed, directed connection between two memories."""
+        return vault.link(source_id, target_id, relation)
+
+    @app.tool()
+    def memory_unlink(source_id: str, target_id: str, relation: str = "related") -> dict:
+        """Remove a connection without deleting either memory."""
+        return vault.unlink(source_id, target_id, relation)
+
+    @app.tool()
+    def memory_neighborhood(memory_id: str, depth: int = 1, limit: int = 100) -> dict:
+        """Explore nearby nodes and relations to reconstruct task context."""
+        return vault.neighbors(memory_id, depth, limit)
+
+    @app.tool()
+    def memory_context(query: str, max_chars: int = 10000) -> dict:
+        """Bring relevant long-term memories into a bounded working context."""
+        return vault.context(query, max_chars)
+
+    @app.tool()
+    def memory_archive(memory_id: str) -> dict:
+        """Hide a memory; encrypted event history retains it."""
+        return vault.archive(memory_id)
+
+    @app.tool()
+    def memory_status() -> dict:
+        """Check dual encrypted journals, record count, and replica separation."""
+        return vault.status()
+
+    app.run(transport="stdio")
+

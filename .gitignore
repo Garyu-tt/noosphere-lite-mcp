@@ -1,0 +1,25 @@
+# Never publish instance state, even from tests.
+*.nlv
+*.sqlite*
+*.db
+*.key
+*.token
+*.pem
+*.p12
+.env
+.env.*
+!*.env.example
+*.log
+*.bak
+*.backup
+*.zip
+*.tar*
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
