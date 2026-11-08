@@ -10,7 +10,7 @@ import os
 import re
 import subprocess
 from pathlib import Path, PurePosixPath
-from .vault import MemoryVault, VaultError
+from .vault import MemoryVault, VaultError, _INTERNAL_WRITER
 
 ALIAS = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,47}\Z")
 OBJECT = re.compile(r"(?:[a-f0-9]{40}|[a-f0-9]{64})\Z")
@@ -109,7 +109,8 @@ class GitDriftGuard:
                     expected_blob=state["committed_blob"],
                     observed_commit=state["commit"], memory_id=memory_id)
         record = self.vault.add("Git anchor " + alias + ":" + relative_path,
-                                json.dumps(info, sort_keys=True), kind="git_anchor")
+                                json.dumps(info, sort_keys=True), kind="git_anchor",
+                                _internal_writer=_INTERNAL_WRITER)
         self.vault.link(memory_id, record["id"], "derived_from")
         return {"anchor_id": record["id"], "memory_id": memory_id,
                 "repo_alias": alias, "relative_path": relative_path,
@@ -141,8 +142,8 @@ class GitDriftGuard:
         except (KeyError, TypeError, ValueError, VaultError, UnicodeError):
             return {"status": "stale_or_unavailable", "reason": "git_provenance_unavailable"}
 
-    def status(self, memory_id: str) -> dict:
-        state = self.vault._snapshot()
+    def status(self, memory_id: str, *, _snapshot=None) -> dict:
+        state = _snapshot if _snapshot is not None else self.vault._snapshot()
         if memory_id not in state.nodes:
             raise VaultError("memory not found")
         items = [self.inspect_anchor(state.nodes[parent]) | {"anchor_id": parent}

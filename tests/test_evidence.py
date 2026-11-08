@@ -118,10 +118,10 @@ class EvidenceGateTests(unittest.TestCase):
         real = self.gate.propose("linked", source, "/count")
         node = self.vault.read(real["id"])
         # Same signed-looking metadata, but no source dependency link.
-        forged = self.vault.add("linked", node["body"], kind="evidence_claim")
+        with self.assertRaisesRegex(VaultError, "reserved"):
+            self.vault.add("linked", node["body"], kind="evidence_claim")
         hits = self.gate.query("linked")["facts"]
         self.assertEqual([x["claim_id"] for x in hits], [real["id"]])
-        self.assertEqual(self.vault.read(forged["id"])["kind"], "evidence_claim")
 
     def test_stale_source_rejected_without_cascade(self):
         source = self.source()

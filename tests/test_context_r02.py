@@ -1,6 +1,7 @@
 """Evidence R02: trust boundaries, budgets, legacy labelling, replay."""
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from noosphere_lite.context_r02 import context
@@ -26,6 +27,17 @@ class ContextR02Tests(unittest.TestCase):
         self.assertEqual(res['mode'], 'legacy_unreviewed')
         self.assertFalse(res['truth_guaranteed'])
         self.assertEqual(res['memories'][0]['evidence_status'], 'unreviewed_legacy_memory')
+
+    def test_mcp_normal_context_one_authenticated_snapshot_with_git_guard(self):
+        from noosphere_lite.git_drift_r03 import GitDriftGuard
+        for i in range(18):
+            self.vault.add(f"Repeated lookup {i}", "Repeated topic note")
+        guard = GitDriftGuard(self.vault)
+        with patch.object(self.vault, "_snapshot", wraps=self.vault._snapshot) as spy:
+            result = context(self.vault, self.gate, "Repeated", git_guard=guard)
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(len(result["memories"]), 16)
+        self.assertTrue(all(x["git_provenance"] == "unanchored" for x in result["memories"]))
 
     def test_strict_context_excludes_legacy_and_keeps_proof(self):
         self.vault.add('Production', 'Fake success report')

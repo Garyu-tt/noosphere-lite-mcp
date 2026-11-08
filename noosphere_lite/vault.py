@@ -27,6 +27,10 @@ MAX_FRAME = 1_048_576
 MAX_BODY = 65_536
 MAX_EVENTS = 150_000
 
+# Internal capability only passed by the trusted package's own writers.
+# Not a sandbox for arbitrary Python code: this is an MCP tool input boundary.
+_INTERNAL_WRITER = object()
+
 
 class VaultError(RuntimeError):
     pass
@@ -322,7 +326,12 @@ class MemoryVault:
     def add(self, title: str, body: str, tags: list[str] | None = None,
             kind: str = "note", source: str = "", *,
             valid_from: str | None = None, valid_to: str | None = None,
-            observed_at: str | None = None) -> dict:
+            observed_at: str | None = None,
+            _internal_writer: object | None = None) -> dict:
+        if not isinstance(kind, str) or not kind.strip() or len(kind) > 32:
+            raise VaultError("invalid memory kind")
+        if (kind.startswith("evidence_") or kind == "git_anchor") and _internal_writer is not _INTERNAL_WRITER:
+            raise VaultError("reserved system memory kinds require trusted package writer")
         if not 1 <= len(title.strip()) <= 256 or len(body) > 48_000:
             raise VaultError("invalid title/body size")
         tags = tags or []
@@ -347,7 +356,8 @@ class MemoryVault:
         return dict(node)
 
     def search(self, query: str, limit: int = 10,
-               as_of: str | None = None) -> list[dict]:
+               as_of: str | None = None, *,
+               _snapshot: Snapshot | None = None) -> list[dict]:
         if not 1 <= len(query.strip()) <= 300:
             raise VaultError("query length must be 1..300")
         moment = _utc_instant(as_of)
@@ -355,7 +365,8 @@ class MemoryVault:
         terms = _words(query)
         needle = query.casefold().strip()
         scored = []
-        for node in self._snapshot().nodes.values():
+        state = _snapshot if _snapshot is not None else self._snapshot()
+        for node in state.nodes.values():
             if node.get("archived"):
                 continue
             # Evidence claims and retractions must never bypass the evidence gate.
@@ -433,12 +444,14 @@ class MemoryVault:
                       status=state.nodes[i].get("status", "current")) for i in discovered]
         return {"nodes": nodes, "links": edges[:800]}
 
-    def context(self, query: str, max_chars: int = 10_000) -> dict:
-        results = self.search(query, 16)
+    def context(self, query: str, max_chars: int = 10_000, *,
+                _snapshot: Snapshot | None = None) -> dict:
+        state = _snapshot if _snapshot is not None else self._snapshot()
+        results = self.search(query, 16, _snapshot=state)
         budget = max(500, min(max_chars, 40_000))
         selected = []
         for hit in results:
-            node = self.read(hit["id"])
+            node = dict(state.nodes[hit["id"]])
             size = len(node["body"]) + len(node["title"]) + 200
             if size > budget:
                 if not selected:

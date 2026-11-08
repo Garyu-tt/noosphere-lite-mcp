@@ -50,13 +50,14 @@ def context(vault: MemoryVault, evidence: EvidenceGate, query: str,
         }
     if as_of is not None:
         raise VaultError("historical context requires source_grounded_only=true")
-    result = vault.context(query, max_chars)
+    snapshot = vault._snapshot()
+    result = vault.context(query, max_chars, _snapshot=snapshot)
     kept, drifted = [], 0
     for memory in result["memories"]:
         memory["evidence_status"] = "unreviewed_legacy_memory"
         memory["truth_guaranteed"] = False
         if git_guard is not None:
-            observed = git_guard.status(memory["id"])
+            observed = git_guard.status(memory["id"], _snapshot=snapshot)
             memory["git_provenance"] = observed["status"]
             if observed["status"] == "stale_needs_review":
                 drifted += 1

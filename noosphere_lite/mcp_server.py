@@ -5,6 +5,19 @@ from .briefing import MemoryBriefings
 from .context_r02 import context as trust_context
 from .git_drift_r03 import GitDriftGuard
 
+def _search_with_provenance(vault: MemoryVault, git_guard: GitDriftGuard,
+                            query: str, limit: int = 10,
+                            as_of: str | None = None) -> list[dict]:
+    """One journal replay per request; all hits share a consistent snapshot."""
+    snapshot = vault._snapshot()
+    hits = vault.search(query, limit, as_of=as_of, _snapshot=snapshot)
+    for hit in hits:
+        hit["evidence_status"] = "unreviewed_legacy_memory"
+        hit["truth_guaranteed"] = False
+        hit["git_provenance"] = git_guard.status(hit["id"], _snapshot=snapshot)["status"]
+    return hits
+
+
 def run(vault: MemoryVault):
     try:
         try:
@@ -32,12 +45,7 @@ def run(vault: MemoryVault):
     def memory_search(query: str, limit: int = 10,
                       as_of: str | None = None) -> list[dict]:
         """Find memories, optionally filtering by explicitly known validity at an instant."""
-        hits = vault.search(query, limit, as_of=as_of)
-        for hit in hits:
-            hit["evidence_status"] = "unreviewed_legacy_memory"
-            hit["truth_guaranteed"] = False
-            hit["git_provenance"] = git_guard.status(hit["id"])["status"]
-        return hits
+        return _search_with_provenance(vault, git_guard, query, limit, as_of)
 
     @app.tool()
     def memory_suggest_links(memory_id: str, limit: int = 10) -> list[dict]:

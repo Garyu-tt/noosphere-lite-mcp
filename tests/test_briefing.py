@@ -142,7 +142,8 @@ class BriefingTests(unittest.TestCase):
 
     def test_regular_note_and_internal_evidence_do_not_bypass(self):
         self.vault.add("casual","Unverified",tags=["project:alpha"],kind="note")
-        self.vault.add("not really","{}",tags=["project:alpha"],kind="evidence_claim")
+        with self.assertRaisesRegex(VaultError, "reserved"):
+            self.vault.add("not really","{}",tags=["project:alpha"],kind="evidence_claim")
         self.assertEqual(self.reader.briefing("alpha",include_evidence=False)["records"],[])
 
     def test_bad_inputs_fail(self):
