@@ -36,6 +36,38 @@ Only explicit derived_from links trigger a cascade. Lite does not yet extract de
 
 **Local-first MCP.** Runs on Linux without a separate model, GPU or cloud service. The stdio MCP server exposes memory tools and does not listen on a public HTTP port, execute shell commands or browse arbitrary host files.
 
+## Opt-in project-bound MCP instances (process isolation)
+
+For projects that must not see one another's memory, launch one MCP process
+**per project** with an operator-controlled `NSL_BOUND_PROJECT` variable.
+`NSL_PRIMARY` and `NSL_MIRROR` are now **base directories**, and
+`NSL_KEY_FILE` is the template key file path. The runtime automatically
+places each project's two encrypted journals in
+`<base>/projects/<project>` and a separate AES key at
+`<key-parent>/projects/<project>/<key-name>`.
+
+```sh
+export NSL_PRIMARY=/mnt/disk-a/noosphere
+export NSL_MIRROR=/mnt/disk-b/noosphere
+export NSL_KEY_FILE="$HOME/.config/noosphere-lite/key"
+export NSL_BOUND_PROJECT=frontend
+python -m noosphere_lite init
+python -m noosphere_lite mcp
+```
+
+The MCP client cannot select or widen its project. Evidence queries and
+briefings use the configured project; other project IDs are rejected. Legacy
+unscoped vaults remain unchanged; their contents are **not automatically
+migrated** into scoped vaults. Explicit vault-path overrides are disabled in
+scoped mode. **Do not point separate projects to the same directories/key.**
+
+**Security boundary:** this is per-process, per-journal isolation for trusted
+stdio launch configurations, **not** multi-tenant row-level authorization.
+If unrelated/untrusted Unix users or processes share the same operating-system
+account or can read the environment, credentials, project vaults or launch
+configuration, this mode does not isolate them. Use distinct OS identities and
+filesystem access controls for genuinely untrusted tenants.
+
 ## Install (Python 3.11+)
 
     git clone https://github.com/Garyu-tt/noosphere-lite-mcp.git
