@@ -173,3 +173,8 @@ Lite работает локально на Linux и не требует обл�
 **Noosphere Lite MCP — чтобы новый разговор не означал новое начало.**
 
 *Garyu-tt · GNU GPLv3 · [English documentation](README_EN.md)*
+
+
+## License / Authorship
+
+Original project code in this release: **GNU GPL-3.0-or-later**. Copyright (C) 2026 [Garyu-tt](https://github.com/Garyu-tt). See [LICENSE](LICENSE) and [AUTHORS.md](AUTHORS.md). Previously published MIT-licensed versions retain their earlier permissions and existing contributors' acknowledgments.
