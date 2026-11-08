@@ -359,7 +359,7 @@ class MemoryVault:
             if node.get("archived"):
                 continue
             # Evidence claims and retractions must never bypass the evidence gate.
-            if str(node.get("kind", "")).startswith("evidence_"):
+            if str(node.get("kind", "")).startswith("evidence_") or node.get("kind") == "git_anchor":
                 continue
             if moment is not None:
                 start, end = node.get("valid_from"), node.get("valid_to")
