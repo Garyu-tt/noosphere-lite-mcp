@@ -1,5 +1,6 @@
 """MCP stdio adapter; no network listener and no private Noosphere dependencies."""
 from .vault import MemoryVault
+from .evidence import EvidenceGate
 
 def run(vault: MemoryVault):
     try:
@@ -10,6 +11,7 @@ def run(vault: MemoryVault):
     except ImportError as e:
         raise RuntimeError("Install dependencies: pip install -e .") from e
     app = MCPApp("noosphere-lite-mcp")
+    evidence = EvidenceGate(vault)
 
     @app.tool()
     def memory_add(title: str, body: str, tags: list[str] | None = None,
@@ -79,6 +81,36 @@ def run(vault: MemoryVault):
     def memory_status() -> dict:
         """Check dual encrypted journals, record count, and replica separation."""
         return vault.status()
+
+    @app.tool()
+    def memory_evidence_source_add(title: str, json_document: str,
+                                   scope: str = "default",
+                                   observed_at: str | None = None) -> dict:
+        """Store structured source JSON in the encrypted journal; NOT proof of truth."""
+        return evidence.add_source(title, json_document, scope=scope,
+                                   observed_at=observed_at)
+
+    @app.tool()
+    def memory_evidence_propose(fact_key: str, source_id: str, pointer: str,
+                                scope: str = "default",
+                                valid_from: str | None = None,
+                                valid_to: str | None = None,
+                                stale_after: str | None = None) -> dict:
+        """Bind an unreviewed claim to an exact source JSON pointer. No truth promotion."""
+        return evidence.propose(fact_key, source_id, pointer, scope=scope,
+                                valid_from=valid_from, valid_to=valid_to,
+                                stale_after=stale_after)
+
+    @app.tool()
+    def memory_evidence_reject(claim_id: str, reason: str) -> dict:
+        """Persist a rejection tombstone and invalidate the claim and descendants."""
+        return evidence.reject(claim_id, reason)
+
+    @app.tool()
+    def memory_evidence_context(query: str = "", scope: str = "default",
+                                as_of: str | None = None, limit: int = 20) -> dict:
+        """Only source-matched observations; conflicting or stale facts are withheld."""
+        return evidence.query(query, scope=scope, as_of=as_of, limit=limit)
 
     app.run(transport="stdio")
 
