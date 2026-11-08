@@ -214,8 +214,10 @@ class EvidenceGate:
                     discard("expired")
                     continue
                 source = snap.nodes.get(c["source_id"])
-                if not source or source.get("kind") != "evidence_source":
-                    discard("missing_source")
+                if (not source or source.get("kind") != "evidence_source"
+                        or source.get("archived") or source.get("status") != "current"
+                        or c["source_id"] not in dependencies.get(claim_id, ())):
+                    discard("missing_or_stale_source")
                     continue
                 if hashlib.sha256(source["body"].encode("utf-8")).hexdigest() != c["source_sha256"]:
                     discard("source_changed")
