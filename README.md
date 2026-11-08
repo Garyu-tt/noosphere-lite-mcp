@@ -2,7 +2,7 @@
 
 **Память для ИИ, которой не нужно помещаться в контекстное окно.**
 
-*Автор — Лёха · Версия 0.2.0 · Linux / Python / MCP · MIT License*
+*Автор — Garyu-tt · Версия 0.2.0 · Linux / Python / MCP · GNU GPLv3*
 
 [English documentation](README_EN.md)
 
@@ -172,4 +172,4 @@ Lite работает локально на Linux и не требует обл�
 
 **Noosphere Lite MCP — чтобы новый разговор не означал новое начало.**
 
-*Лёха · MIT License · [English documentation](README_EN.md)*
+*Garyu-tt · GNU GPLv3 · [English documentation](README_EN.md)*
