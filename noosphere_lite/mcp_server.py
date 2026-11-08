@@ -13,14 +13,19 @@ def run(vault: MemoryVault):
 
     @app.tool()
     def memory_add(title: str, body: str, tags: list[str] | None = None,
-                   kind: str = "note", source: str = "") -> dict:
-        """Persist a note, decision, task, or observation in the encrypted memory."""
-        return vault.add(title, body, tags, kind, source)
+                   kind: str = "note", source: str = "",
+                   valid_from: str | None = None,
+                   valid_to: str | None = None,
+                   observed_at: str | None = None) -> dict:
+        """Persist dated memory: recorded_at is automatic; validity is explicitly sourced."""
+        return vault.add(title, body, tags, kind, source,
+                         valid_from=valid_from, valid_to=valid_to, observed_at=observed_at)
 
     @app.tool()
-    def memory_search(query: str, limit: int = 10) -> list[dict]:
-        """Find relevant memories; use memory_read for payload."""
-        return vault.search(query, limit)
+    def memory_search(query: str, limit: int = 10,
+                      as_of: str | None = None) -> list[dict]:
+        """Find memories, optionally filtering by explicitly known validity at an instant."""
+        return vault.search(query, limit, as_of=as_of)
 
     @app.tool()
     def memory_suggest_links(memory_id: str, limit: int = 10) -> list[dict]:
@@ -53,9 +58,12 @@ def run(vault: MemoryVault):
         return vault.context(query, max_chars)
 
     @app.tool()
-    def memory_revise(memory_id: str, body: str, title: str | None = None) -> dict:
-        """Revise a source memory; descendants using derived_from become stale."""
-        return vault.revise(memory_id, body, title)
+    def memory_revise(memory_id: str, body: str, title: str | None = None,
+                      valid_from: str | None = None,
+                      valid_to: str | None = None) -> dict:
+        """Revise a source memory, its known validity, and stale its derived descendants."""
+        return vault.revise(memory_id, body, title,
+                            valid_from=valid_from, valid_to=valid_to)
 
     @app.tool()
     def memory_invalidate(memory_id: str, reason: str = "Source no longer verified") -> dict:
