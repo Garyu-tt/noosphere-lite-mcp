@@ -76,7 +76,12 @@ Example for stdio-compatible MCP host configuration:
 
 Hosted ChatGPT use may require a separately supported MCP bridge; this local configuration does not itself install a hosted ChatGPT connector.
 
-## Twelve MCP tools
+### Encrypted project briefings and source cards (R02)
+
+The new [memory_briefing and memory_by_source](docs/encrypted-briefings-r02.md) tools read the existing NLV1 AES-GCM journal in memory, **without creating a plaintext search index**. Opt in by tagging notes `project:my-app` and using the `negative`, `invariant`, `open_loop`, `decision` or `fact` kinds. Source-path matching uses exact labels and never reads files or verifies their Git freshness. EvidenceGate separately supplies source-matched, unreviewed observations and conflict flags, not proven facts. Project tags are filters, NOT access controls.
+
+
+## Eighteen MCP tools
 
 | Tool | Purpose |
 | --- | --- |
@@ -91,6 +96,10 @@ Hosted ChatGPT use may require a separately supported MCP bridge; this local con
 | memory_invalidate | Mark a record and its dependencies stale |
 | memory_archive | Hide without destroying encrypted history |
 | memory_status | Verify journals and counts |
+| memory_evidence_source_add / memory_evidence_propose | Store source JSON and propose an unreviewed, pointer-matched claim |
+| memory_evidence_reject / memory_evidence_context | Preserve retractions and read only source-matched candidates with conflict checks |
+| memory_briefing | Assemble scoped constraints, open work and source-matched observations from the encrypted journal |
+| memory_by_source | Retrieve project notes by exact stored source label, without accessing host files |
 
 ## Experimental reviewed graph weights (R04)
 
