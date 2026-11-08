@@ -11,7 +11,7 @@ class CorpusTests(unittest.TestCase):
  def test_integrity(self):
   self.assertEqual(self.db.execute('PRAGMA quick_check').fetchone()[0],'ok')
  def test_dataset_count(self):
-  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM datasets').fetchone()[0],14)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM datasets').fetchone()[0],16)
  def test_worm_source_separation(self):
   kinds=[x[0] for x in self.db.execute("SELECT DISTINCT relation FROM edges WHERE dataset LIKE 'worm_%'").fetchall()]
   self.assertEqual(set(kinds),{'chemical','electrical_asymmetric','electrical_symmetric'})
@@ -25,6 +25,15 @@ class CorpusTests(unittest.TestCase):
   self.assertEqual(report['male_cns_v10']['raw_rows'],151856684)
   self.assertEqual(report['male_cns_v10']['selected_rows'],55520)
   self.assertEqual(report['h01_swc_fragments']['files'],3327)
+ def test_banc_crosswalk_candidates_not_identity(self):
+  self.assertGreater(self.db.execute('SELECT COUNT(*) FROM crosswalk').fetchone()[0],1000)
+  self.assertEqual(self.db.execute('SELECT DISTINCT method FROM crosswalk').fetchone()[0],'NBLAST_morphology_candidate')
+ def test_banc_version_separation(self):
+  self.assertEqual(self.db.execute("SELECT COUNT(DISTINCT dataset) FROM edges WHERE dataset LIKE 'banc_%'").fetchone()[0],2)
+ def test_crosswalk_query_warning(self):
+  p=query('banc_v888_v3',None,3,'crosswalk')
+  self.assertIn('NOT proof',p['warning'])
+  self.assertEqual(len(p['results']),3)
  def test_no_float_identity_conversion(self):
   x=self.db.execute("SELECT neuron_id FROM neurons WHERE dataset='flywire_783' LIMIT 1").fetchone()[0]
   self.assertTrue(x.isdigit() and len(x)>=15)
