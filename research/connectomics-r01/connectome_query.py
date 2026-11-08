@@ -16,6 +16,11 @@ def query(dataset,neuron=None,limit=10,mode='neighbors',direction='out'):
   rows=db.execute('SELECT dataset,COUNT(*) AS indexed_rows,SUM(weight) AS indexed_contact_weight FROM edges GROUP BY dataset ORDER BY dataset').fetchall()
  elif mode=='hub':
   rows=db.execute('SELECT src,COUNT(*) AS connections,SUM(weight) AS indexed_contact_weight FROM edges WHERE dataset=? GROUP BY src ORDER BY indexed_contact_weight DESC LIMIT ?', (dataset,limit)).fetchall()
+ elif mode=='crosswalk':
+  if neuron:
+   rows=db.execute('SELECT * FROM crosswalk WHERE source_dataset=? AND source_id=? ORDER BY score DESC LIMIT ?', (dataset,neuron,limit)).fetchall()
+  else:
+   rows=db.execute('SELECT * FROM crosswalk WHERE source_dataset=? ORDER BY score DESC LIMIT ?', (dataset,limit)).fetchall()
  elif mode=='morphology':
   rows=db.execute('SELECT * FROM morphologies WHERE dataset=? ORDER BY nodes DESC LIMIT ?',(dataset,limit)).fetchall()
  elif mode=='cell':
@@ -26,16 +31,17 @@ def query(dataset,neuron=None,limit=10,mode='neighbors',direction='out'):
   cond='src=?' if direction=='out' else 'dst=?'
   rows=db.execute(f'SELECT src,dst,weight,relation,region,provenance,attrs_json FROM edges WHERE dataset=? AND {cond} ORDER BY weight DESC LIMIT ?', (dataset,neuron,limit)).fetchall()
  else:raise SystemExit(f'Unknown mode: {mode}')
- out={'dataset':dataset,'query_type':mode,'completeness':'indexed_subset_except_worm','physiology_inference':False,'results':[dict(r) for r in rows]}
+ out={'dataset':dataset,'query_type':mode,'completeness':'see_reports/index_report.json_for_each_dataset','physiology_inference':False,'results':[dict(r) for r in rows]}
  if dataset:
   m=db.execute('SELECT * FROM datasets WHERE dataset=?',(dataset,)).fetchone()
   out['source']=dict(m) if m else None
+  if mode=='crosswalk':out['warning']='NBLAST morphological similarity is NOT proof of neuronal identity.'
  db.close()
  return out
 
 def main():
  p=argparse.ArgumentParser(description='Query the Noosphere connectomics atlas in read-only mode')
- p.add_argument('action',choices=['list','stats','neighbors','hub','morphology','cell'])
+ p.add_argument('action',choices=['list','stats','neighbors','hub','morphology','cell','crosswalk'])
  p.add_argument('--dataset',default='worm_herm_chemical')
  p.add_argument('--neuron',help='Exact neuron/body ID, no float conversion')
  p.add_argument('--limit',type=int,default=10)
