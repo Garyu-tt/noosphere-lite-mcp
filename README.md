@@ -206,3 +206,16 @@ Original project code in this release: **GNU GPL-3.0-or-later**. Copyright (C) 2
 ### Git-aware память R03
 
 После настройки разрешённых локальных репозиториев через `NSL_GIT_ROOTS_JSON` привязать запись к версии файла можно с `memory_git_anchor`, а проверить изменения — с `memory_git_status` или `memory_git_scan`. Строгая память не возвращает знания, чей привязанный исходный код изменён; автоматического признания исправленного кода истинным нет. [Документация](docs/GIT_DRIFT_R03.md).
+
+
+## Peer Noosphere compatibility (read-only, opt-in)
+
+The portable peer bridge can index JinNing6/Noosphere reviewed, SHA-256-addressed
+Skill releases and import a user-exported SweetSophia/noosphere Markdown ZIP.
+Observations are not verified facts, remote Skill text is never executed, and
+restricted wiki articles are excluded by default.
+
+Run: python -m noosphere_lite.peer_cli sync-skills --db /your/private/peers.sqlite3
+
+To enable two additional MCP read-only tools, set NSL_PEER_DB to the path
+of an initialized peer database. See docs/PEER_NOOSPHERE_INTEROP_R01.md.
