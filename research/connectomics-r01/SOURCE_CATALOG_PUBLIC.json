@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-11-08T15:53:19.635145+00:00",
+  "recorded_at": "2026-11-08T15:54:59.992892+00:00",
   "source_commit_pins": [
     {
       "project": "drosophila-brain-model",
@@ -56,37 +56,37 @@
     {
       "name": "raw/e11/affs_config.json",
       "bytes": 160,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/affs/config.json"
     },
     {
       "name": "raw/e11/binary_channel_model.pt",
       "bytes": 3031146,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/binary_channel_agnostic/pred_model-tmp.pt"
     },
     {
       "name": "raw/e11/enhanced_config.json",
       "bytes": 162,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/enhanced/config.json"
     },
     {
       "name": "raw/e11/synapse_excitatory_checkpoint",
       "bytes": 44993430,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/synapses/excitatory/model_checkpoint_45000"
     },
     {
       "name": "raw/e11/synapse_excitatory_model.pt",
       "bytes": 15002272,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/synapses/excitatory/model.pt"
     },
     {
       "name": "raw/e11/uniform_config.json",
       "bytes": 595,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/config.json"
     },
     {
       "name": "raw/e11/uniform_model.pt",
       "bytes": 21178760,
-      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/ (specific prefix recorded in README)"
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/model.pt"
     },
     {
       "name": "raw/flywire/neuron_annotations_783.tsv",
