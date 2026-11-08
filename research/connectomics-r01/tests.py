@@ -11,7 +11,7 @@ class CorpusTests(unittest.TestCase):
  def test_integrity(self):
   self.assertEqual(self.db.execute('PRAGMA quick_check').fetchone()[0],'ok')
  def test_dataset_count(self):
-  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM datasets').fetchone()[0],16)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM datasets').fetchone()[0],17)
  def test_worm_source_separation(self):
   kinds=[x[0] for x in self.db.execute("SELECT DISTINCT relation FROM edges WHERE dataset LIKE 'worm_%'").fetchall()]
   self.assertEqual(set(kinds),{'chemical','electrical_asymmetric','electrical_symmetric'})
@@ -34,6 +34,10 @@ class CorpusTests(unittest.TestCase):
   p=query('banc_v888_v3',None,3,'crosswalk')
   self.assertIn('NOT proof',p['warning'])
   self.assertEqual(len(p['results']),3)
+ def test_microns_metadata_not_fake_edges(self):
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM edges WHERE dataset='microns_v661'").fetchone()[0],0)
+  self.assertGreater(self.db.execute("SELECT COUNT(*) FROM neuron_metrics WHERE dataset='microns_v661'").fetchone()[0],100000)
+  self.assertGreater(len(query('microns_v661',None,2,'metrics')['results']),0)
  def test_no_float_identity_conversion(self):
   x=self.db.execute("SELECT neuron_id FROM neurons WHERE dataset='flywire_783' LIMIT 1").fetchone()[0]
   self.assertTrue(x.isdigit() and len(x)>=15)
