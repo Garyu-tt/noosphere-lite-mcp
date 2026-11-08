@@ -2,7 +2,7 @@
 
 **Long-term memory for AI agents that does not need to fit inside a context window.**
 
-*By Lyokha · v0.2.0 · Linux / Python / MCP · MIT License*
+*By Garyu-tt · v0.2.0 · Linux / Python / MCP · GNU GPLv3*
 
 [Русская документация](README.md)
 
@@ -109,4 +109,4 @@ Tests cover encryption, tamper detection, mirror recovery, graph navigation, and
 
 **Noosphere Lite MCP — because a new conversation shouldn't mean starting from scratch.**
 
-*Lyokha · MIT License · [По-русски](README.md)*
+*Garyu-tt · GNU GPLv3 · [По-русски](README.md)*
