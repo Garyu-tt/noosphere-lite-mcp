@@ -358,6 +358,9 @@ class MemoryVault:
         for node in self._snapshot().nodes.values():
             if node.get("archived"):
                 continue
+            # Evidence claims and retractions must never bypass the evidence gate.
+            if str(node.get("kind", "")).startswith("evidence_"):
+                continue
             if moment is not None:
                 start, end = node.get("valid_from"), node.get("valid_to")
                 # Unknown historical validity must not be presented as proven.
