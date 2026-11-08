@@ -3,6 +3,7 @@ from .vault import MemoryVault
 from .evidence import EvidenceGate
 from .briefing import MemoryBriefings
 from .context_r02 import context as trust_context
+from .git_drift_r03 import GitDriftGuard
 
 def run(vault: MemoryVault):
     try:
@@ -13,8 +14,9 @@ def run(vault: MemoryVault):
     except ImportError as e:
         raise RuntimeError("Install dependencies: pip install -e .") from e
     app = MCPApp("noosphere-lite-mcp")
-    evidence = EvidenceGate(vault)
-    briefings = MemoryBriefings(vault)
+    git_guard = GitDriftGuard.configured(vault)
+    evidence = EvidenceGate(vault, git_guard=git_guard)
+    briefings = MemoryBriefings(vault, git_guard=git_guard)
 
     @app.tool()
     def memory_add(title: str, body: str, tags: list[str] | None = None,
@@ -34,6 +36,7 @@ def run(vault: MemoryVault):
         for hit in hits:
             hit["evidence_status"] = "unreviewed_legacy_memory"
             hit["truth_guaranteed"] = False
+            hit["git_provenance"] = git_guard.status(hit["id"])["status"]
         return hits
 
     @app.tool()
@@ -68,7 +71,8 @@ def run(vault: MemoryVault):
         """Legacy notes are explicitly unreviewed; strict evidence mode is opt-in."""
         return trust_context(vault, evidence, query, max_chars,
                              source_grounded_only=source_grounded_only,
-                             scope=scope, as_of=as_of)
+                             scope=scope, as_of=as_of,
+                             git_guard=git_guard)
 
     @app.tool()
     def memory_source_grounded_context(query: str, scope: str = "default",
@@ -77,6 +81,21 @@ def run(vault: MemoryVault):
         """Strict source-matched context without unreviewed memories or inferred truth."""
         return trust_context(vault, evidence, query, max_chars,
                              source_grounded_only=True, scope=scope, as_of=as_of)
+
+    @app.tool()
+    def memory_git_anchor(memory_id: str, repo_alias: str, relative_path: str) -> dict:
+        """Pin a memory to an allowlisted clean committed Git blob; never assert truth."""
+        return git_guard.anchor(memory_id, repo_alias, relative_path)
+
+    @app.tool()
+    def memory_git_status(memory_id: str) -> dict:
+        """Read live Git drift status of a memory's file anchors."""
+        return git_guard.status(memory_id)
+
+    @app.tool()
+    def memory_git_scan(invalidate_stale: bool = False, limit: int = 100) -> dict:
+        """Find drift; optionally mark affected memories and descendants stale."""
+        return git_guard.scan(invalidate=invalidate_stale, limit=limit)
 
     @app.tool()
     def memory_revise(memory_id: str, body: str, title: str | None = None,

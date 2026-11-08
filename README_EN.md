@@ -146,3 +146,7 @@ An exploratory benchmark from the owner's much larger private metagraph is publi
 ### Evidence-first context R02 (2026-11-08)
 
 Normal `memory_search` and `memory_context` results are now explicitly labelled as unreviewed notes. For source-matched observations only, use `memory_source_grounded_context` or `memory_context(..., source_grounded_only=true)`. Strict mode cannot silently fall back to legacy notes; evidence equality is not world truth. See [R02 documentation](docs/EVIDENCE_CONTEXT_R02.md).
+
+### Git-aware memory drift detection R03
+
+Configure operator-approved local repositories via `NSL_GIT_ROOTS_JSON`, then bind a memory with `memory_git_anchor`; use `memory_git_status` or `memory_git_scan` to check code drift. Strict evidence linked to changed Git source is withheld on every read. This monitors local Git checkouts without running code or fetching remotes. [Details and limitations](docs/GIT_DRIFT_R03.md).

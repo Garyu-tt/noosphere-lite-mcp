@@ -104,8 +104,9 @@ def _pack(rows: list[dict], budget: int, limit: int) -> tuple[list[dict], int, i
 class MemoryBriefings:
     """Scoped, fail-closed read views over the existing NLV1 AES-GCM vault."""
 
-    def __init__(self, vault: MemoryVault):
+    def __init__(self, vault: MemoryVault, git_guard=None):
         self.vault = vault
+        self.git_guard = git_guard
 
     def briefing(self, project: str, *, at: str | None = None,
                  limit: int = 20, max_chars: int = 12_000,
@@ -154,7 +155,7 @@ class MemoryBriefings:
         source_matched = []
         dropped_evidence = 0
         if include_evidence:
-            gate = EvidenceGate(self.vault).query("", scope=project, as_of=when, limit=50)
+            gate = EvidenceGate(self.vault, git_guard=self.git_guard).query("", scope=project, as_of=when, limit=50)
             # This path holds only source-matched candidates; no claim of truth.
             evidence_budget = max_chars - used - 1800
             source_matched, dropped_evidence, _ = _pack(
