@@ -110,3 +110,8 @@ Tests cover encryption, tamper detection, mirror recovery, graph navigation, and
 **Noosphere Lite MCP — because a new conversation shouldn't mean starting from scratch.**
 
 *Garyu-tt · GNU GPLv3 · [По-русски](README.md)*
+
+
+## License / Authorship
+
+Original project code in this release: **GNU GPL-3.0-or-later**. Copyright (C) 2026 [Garyu-tt](https://github.com/Garyu-tt). See [LICENSE](LICENSE) and [AUTHORS.md](AUTHORS.md). Previously published MIT-licensed versions retain their earlier permissions and existing contributors' acknowledgments.
