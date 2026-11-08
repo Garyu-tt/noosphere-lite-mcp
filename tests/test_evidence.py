@@ -102,6 +102,34 @@ class EvidenceGateTests(unittest.TestCase):
         self.gate.propose("fact.example", source, "/address")
         self.assertEqual(self.vault.search("fact.example"), [])
 
+    def test_immutable_retractions_and_claims(self):
+        source = self.source()
+        claim = self.gate.propose("immutable", source, "/count")
+        with self.assertRaisesRegex(VaultError, "immutable"):
+            self.vault.revise(claim["id"], "{}")
+        tomb = self.gate.reject(claim["id"], "false")
+        with self.assertRaisesRegex(VaultError, "immutable"):
+            self.vault.revise(tomb["tombstone_id"], "{}")
+        with self.assertRaisesRegex(VaultError, "cannot be archived"):
+            self.vault.archive(tomb["tombstone_id"])
+
+    def test_no_bypass_with_unlinked_forged_claim(self):
+        source = self.source()
+        real = self.gate.propose("linked", source, "/count")
+        node = self.vault.read(real["id"])
+        # Same signed-looking metadata, but no source dependency link.
+        forged = self.vault.add("linked", node["body"], kind="evidence_claim")
+        hits = self.gate.query("linked")["facts"]
+        self.assertEqual([x["claim_id"] for x in hits], [real["id"]])
+        self.assertEqual(self.vault.read(forged["id"])["kind"], "evidence_claim")
+
+    def test_stale_source_rejected_without_cascade(self):
+        source = self.source()
+        claim = self.gate.propose("source", source, "/count")
+        self.vault.unlink(claim["id"], source, "derived_from")
+        self.vault.invalidate(source, "revoked")
+        self.assertEqual(self.gate.query("source")["facts"], [])
+
     def test_journal_replay_and_mirror(self):
         source = self.source()
         self.gate.propose("replay", source, "/count")
