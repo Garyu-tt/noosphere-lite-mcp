@@ -1,6 +1,7 @@
 """MCP stdio adapter; no network listener and no private Noosphere dependencies."""
 from .vault import MemoryVault
 from .evidence import EvidenceGate
+from .briefing import MemoryBriefings
 
 def run(vault: MemoryVault):
     try:
@@ -12,6 +13,7 @@ def run(vault: MemoryVault):
         raise RuntimeError("Install dependencies: pip install -e .") from e
     app = MCPApp("noosphere-lite-mcp")
     evidence = EvidenceGate(vault)
+    briefings = MemoryBriefings(vault)
 
     @app.tool()
     def memory_add(title: str, body: str, tags: list[str] | None = None,
@@ -111,6 +113,29 @@ def run(vault: MemoryVault):
                                 as_of: str | None = None, limit: int = 20) -> dict:
         """Only source-matched observations; conflicting or stale facts are withheld."""
         return evidence.query(query, scope=scope, as_of=as_of, limit=limit)
+
+    @app.tool()
+    def memory_briefing(project: str, at: str | None = None,
+                        limit: int = 20, max_chars: int = 12_000,
+                        include_evidence: bool = True) -> dict:
+        """Scoped current constraints, work and source-matched observations.
+
+        Project tags and evidence scope are organizational filters, NOT ACLs.
+        No source match is proof of factual truth. No plaintext index is used.
+        """
+        return briefings.briefing(project, at=at, limit=limit,
+                                  max_chars=max_chars,
+                                  include_evidence=include_evidence)
+
+    @app.tool()
+    def memory_by_source(project: str, source_ref: str,
+                         limit: int = 20, max_chars: int = 12_000) -> dict:
+        """Find note cards by an exact stored source label, without filesystem reads.
+
+        Stale records are marked; source labels are NOT Git-verified evidence.
+        """
+        return briefings.by_source(project, source_ref,
+                                   limit=limit, max_chars=max_chars)
 
     app.run(transport="stdio")
 
