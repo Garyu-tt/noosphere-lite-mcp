@@ -31,6 +31,7 @@ def setup(db):
  CREATE TABLE edges (dataset TEXT NOT NULL,src TEXT NOT NULL,dst TEXT NOT NULL,weight INTEGER NOT NULL,relation TEXT NOT NULL,region TEXT,provenance TEXT NOT NULL,attrs_json TEXT NOT NULL);
  CREATE TABLE neurons(dataset TEXT NOT NULL, neuron_id TEXT NOT NULL, cell_type TEXT, cell_class TEXT, neurotransmitter TEXT, attributes TEXT);
  CREATE TABLE morphologies(dataset TEXT, fragment_id TEXT, nodes INTEGER, minx REAL,miny REAL,minz REAL,maxx REAL,maxy REAL,maxz REAL,original_swc TEXT);
+ CREATE TABLE crosswalk(source_dataset TEXT,target_dataset TEXT,source_id TEXT,target_id TEXT,score REAL,method TEXT,validation TEXT,provenance TEXT);
  CREATE TABLE datasets(dataset TEXT PRIMARY KEY,description TEXT NOT NULL,raw_source TEXT, data_version TEXT, type TEXT, source_license TEXT, caveat TEXT, recorded_at TEXT);
  ''')
 
@@ -140,6 +141,53 @@ def morphology(db,report):
  report['h01_swc_fragments']={'files':len(rows),'skeleton_nodes':nodes_total,'not_full_human_connectome':True,
    'note':'SWC filenames are fragments; not necessarily distinct neuron identities or synapses. Units not inferred.'}
 
+def banc(db,report):
+ base='banc/'
+ for version,filename,cutoff in [('banc_v888_v3','banc_888_edgelist_simple_v3.feather',40),('banc_v888_v2_compartment','banc_888_edgelist_split_v2.feather',40)]:
+  t=feather.read_table(RAW/base/filename,memory_map=True)
+  total=t.num_rows;weighted=pc.sum(t['count']).as_py()
+  sel=t.filter(pc.greater_equal(t['count'],cutoff))
+  columns=['pre','post','count']+(['pre_label','post_label','connection','pre_conf_nt','pre_conf_nt_p','post_conf_nt','post_conf_nt_p'] if version.endswith('compartment') else [])
+  a={name:sel[name].to_pylist() for name in columns}
+  def records():
+   for i in range(sel.num_rows):
+    attrs={}
+    if version.endswith('compartment'):
+     attrs={'pre_compartment':a['pre_label'][i],'post_compartment':a['post_label'][i],
+      'nt_predict_pre':a['pre_conf_nt'][i],'nt_confidence_pre':a['pre_conf_nt_p'][i],
+      'nt_predict_post':a['post_conf_nt'][i],'nt_confidence_post':a['post_conf_nt_p'][i],
+      'neurotransmitters_not_measured':True}
+    yield (a['pre'][i],a['post'][i],a['count'][i],
+      'chemical_compartment' if version.endswith('compartment') else 'chemical', None,
+      'raw/'+base+filename,attrs)
+  add_edges(db,version,records())
+  report[version]={'raw_rows':total,'raw_contact_sum':weighted,'indexed_rows':sel.num_rows,'threshold':cutoff,'indexed_subset':True,
+   'warning':'BANC v2/v3 are different synapse versions: do NOT combine or sum them.'}
+  del sel,t,a
+  db.commit()
+  print(version,'raw_rows',total,'indexed',report[version]['indexed_rows'],flush=True)
+ meta=feather.read_table(RAW/base/'banc_888_meta.feather',memory_map=True)
+ relevant=['banc_888_id','cell_type','cell_class','super_class','proofread','root_888']
+ fields={x:meta[x].to_pylist() for x in relevant}
+ def rows():
+  for i,id in enumerate(fields['banc_888_id']):
+   if id is None:continue
+   attrs={'super_class':fields['super_class'][i],'proofread':fields['proofread'][i],'root_888':fields['root_888'][i]}
+   yield 'banc_v888_v3',str(id),fields['cell_type'][i],fields['cell_class'][i],None,json.dumps(attrs,ensure_ascii=False,separators=(',',':'))
+ db.executemany('INSERT INTO neurons VALUES(?,?,?,?,?,?)',rows())
+ report['banc_meta']={'rows':meta.num_rows,'id_key':'banc_888_id'}
+ # Morphological similarity is a candidate cross-atlas link, NOT neuron identity.
+ nt=feather.read_table(RAW/base/'banc_fafb_783_nblast.feather',memory_map=True)
+ candidates=nt.filter(pc.greater_equal(nt['score'],0.8))
+ arrays={x:candidates[x].to_pylist() for x in ('query_root_id','match_id','score','validation')}
+ db.executemany('INSERT INTO crosswalk VALUES(?,?,?,?,?,?,?,?)',
+  (('banc_v888_v3','flywire_783',str(arrays['query_root_id'][i]),str(arrays['match_id'][i]),
+    float(arrays['score'][i]),'NBLAST_morphology_candidate','validated_flag' if arrays['validation'][i] else 'unvalidated',
+    'raw/'+base+'banc_fafb_783_nblast.feather') for i in range(candidates.num_rows)))
+ report['banc_fafb_nblast']={'raw_rows':nt.num_rows,'indexed_score_min':0.8,'candidate_links':candidates.num_rows,
+  'warning':'NBLAST morphological similarity, not biological identity'}
+ db.commit()
+
 def fly_annotations(db,report):
  p=RAW/'flywire/neuron_annotations_783.tsv'
  valid_ids=set(map(str,np.load(RAW/'flywire/proofread_root_ids_783.npy',allow_pickle=False).tolist()))
@@ -183,6 +231,7 @@ def main():
  report['flywire_783']=pick_arrow(db,'flywire/proofread_connections_783.feather','flywire_783',40,flycols,'chemical',True);db.commit()
  report['male_cns_v10']=pick_arrow(db,'malecns/connectome-weights-male-cns-v1.0.feather','male_cns_v10',100,['body_pre','body_post','weight'],'chemical');db.commit()
  hemibrain(db,report);db.commit()
+ banc(db,report);db.commit()
  print('hemibrain done',flush=True)
  larval(db,report);db.commit()
  print('larval done',flush=True)
@@ -204,10 +253,12 @@ def main():
   ('larval_fly_ad','Drosophila larval axon-to-dendrite','raw/larval_fly/Winding2023_supplemental_S1.zip','Winding 2023','chemical','verify','Synaptic compartment label; threshold >=20'),
   ('larval_fly_da','Drosophila larval dendrite-to-axon','raw/larval_fly/Winding2023_supplemental_S1.zip','Winding 2023','chemical','verify','Synaptic compartment label; threshold >=20'),
   ('larval_fly_dd','Drosophila larval dendrite-to-dendrite','raw/larval_fly/Winding2023_supplemental_S1.zip','Winding 2023','chemical','verify','Synaptic compartment label; threshold >=20'),
+  ('banc_v888_v3','Adult female Drosophila full brain and nerve cord','raw/banc/banc_888_edgelist_simple_v3.feather','BANC 888/v3','chemical','verify source rights','v3; strongest contacts indexed; cross-atlas nblast links are not neuronal identity'),
+  ('banc_v888_v2_compartment','Adult female Drosophila compartment-specific brain and cord','raw/banc/banc_888_edgelist_split_v2.feather','BANC 888/v2','chemical','verify source rights','v2 compartment-specific connections; do not merge with v3'),
   ('h01_swc_fragments','Human H01 cortical 1 mm3 skeleton subset','raw/h01/104_proofread_neurons_swc.zip','H01 2021/2024','morphology','verify','3327 SWC files are fragments, not all H01 16k neurons')]:
   db.execute('INSERT INTO datasets VALUES(?,?,?,?,?,?,?,?)',(id,description,raw,ver,kind,lic,caveat,TODAY))
  db.commit()
- db.executescript('CREATE INDEX edge_source ON edges(dataset,src); CREATE INDEX edge_target ON edges(dataset,dst); CREATE INDEX edge_rank ON edges(dataset,weight DESC); CREATE INDEX neuron_lookup ON neurons(dataset,neuron_id); CREATE INDEX morph_lookup ON morphologies(dataset,fragment_id);')
+ db.executescript('CREATE INDEX edge_source ON edges(dataset,src); CREATE INDEX edge_target ON edges(dataset,dst); CREATE INDEX edge_rank ON edges(dataset,weight DESC); CREATE INDEX neuron_lookup ON neurons(dataset,neuron_id); CREATE INDEX morph_lookup ON morphologies(dataset,fragment_id); CREATE INDEX crosswalk_lookup ON crosswalk(source_dataset,source_id);')
  db.commit()
  print('indexes done',flush=True)
  integrity=db.execute('PRAGMA quick_check').fetchone()[0]
@@ -215,6 +266,7 @@ def main():
  report['indexed_edges']=db.execute('SELECT COUNT(*) FROM edges').fetchone()[0]
  report['indexed_neurons']=db.execute('SELECT COUNT(*) FROM neurons').fetchone()[0]
  report['indexed_morphology_fragments']=db.execute('SELECT COUNT(*) FROM morphologies').fetchone()[0]
+ report['nblast_candidate_links']=db.execute('SELECT COUNT(*) FROM crosswalk').fetchone()[0]
  db.close();os.replace(temp,DB)
  json_report={'generated_at':TODAY,'source_release_dates_not_inferred_from_download_time':True,'data':report}
  (ROOT/'reports/index_report.json').write_text(json.dumps(json_report,ensure_ascii=False,indent=2)+'\n')
