@@ -32,6 +32,7 @@ def setup(db):
  CREATE TABLE neurons(dataset TEXT NOT NULL, neuron_id TEXT NOT NULL, cell_type TEXT, cell_class TEXT, neurotransmitter TEXT, attributes TEXT);
  CREATE TABLE morphologies(dataset TEXT, fragment_id TEXT, nodes INTEGER, minx REAL,miny REAL,minz REAL,maxx REAL,maxy REAL,maxz REAL,original_swc TEXT);
  CREATE TABLE crosswalk(source_dataset TEXT,target_dataset TEXT,source_id TEXT,target_id TEXT,score REAL,method TEXT,validation TEXT,provenance TEXT);
+ CREATE TABLE neuron_metrics(dataset TEXT,neuron_id TEXT,n_input INTEGER,n_output INTEGER,avg_input_size REAL,avg_output_size REAL,provenance TEXT);
  CREATE TABLE datasets(dataset TEXT PRIMARY KEY,description TEXT NOT NULL,raw_source TEXT, data_version TEXT, type TEXT, source_license TEXT, caveat TEXT, recorded_at TEXT);
  ''')
 
@@ -188,6 +189,41 @@ def banc(db,report):
   'warning':'NBLAST morphological similarity, not biological identity'}
  db.commit()
 
+def microns(db,report):
+ # Static, historic MICrONS release v661. The current v1926 API is NOT represented by these files.
+ base=RAW/'microns_v661'
+ total=0;stored=0
+ with gzip.open(base/'synapses_pni_2_in_out_degree.csv.gz','rt',newline='') as f:
+  for row in csv.reader(f):
+   try:
+    root,ni,avg_i,no,avg_o=row
+    ni=int(ni);no=int(no);total+=1
+    if ni+no<500:continue
+    db.execute('INSERT INTO neuron_metrics VALUES(?,?,?,?,?,?,?)',
+     ('microns_v661',root,ni,no,float(avg_i),float(avg_o),
+      'raw/microns_v661/synapses_pni_2_in_out_degree.csv.gz'))
+    stored+=1
+   except (ValueError,TypeError):
+    continue
+ nuclei=0;aligned=0
+ with gzip.open(base/'nucleus_detection_v0_merged.csv.gz','rt',newline='') as f:
+  for row in csv.reader(f):
+   nuclei+=1
+   try:
+    nucl,volume,sv,root,x,y,z=row
+    if not root or root=='0':continue
+   except ValueError:continue
+   db.execute('INSERT INTO neurons VALUES(?,?,?,?,?,?)',
+    ('microns_v661',root,None,None,None,
+      json.dumps({'nucleus_id':nucl,'volume':volume,'xyz_source_units_unconfirmed':[x,y,z]},
+       ensure_ascii=False,separators=(',',':'))))
+   aligned+=1
+ report['microns_v661']={'full_degree_rows':total,'strong_degree_rows_indexed':stored,'degree_threshold_n_input_plus_n_output':500,
+  'nucleus_rows_raw':nuclei,'nuclei_with_nonzero_root_id':aligned,'edges_downloaded':False,
+  'note':'Archived MICrONS static v661 (NOT v1926 portal); graph connectivity edges and functional physiology NOT downloaded.'}
+ db.commit()
+ print('MICrONS v661 degree rows',total,'indexed',stored,'mapped nuclei',aligned,flush=True)
+
 def fly_annotations(db,report):
  p=RAW/'flywire/neuron_annotations_783.tsv'
  valid_ids=set(map(str,np.load(RAW/'flywire/proofread_root_ids_783.npy',allow_pickle=False).tolist()))
@@ -232,6 +268,7 @@ def main():
  report['male_cns_v10']=pick_arrow(db,'malecns/connectome-weights-male-cns-v1.0.feather','male_cns_v10',100,['body_pre','body_post','weight'],'chemical');db.commit()
  hemibrain(db,report);db.commit()
  banc(db,report);db.commit()
+ microns(db,report);db.commit()
  print('hemibrain done',flush=True)
  larval(db,report);db.commit()
  print('larval done',flush=True)
@@ -253,12 +290,13 @@ def main():
   ('larval_fly_ad','Drosophila larval axon-to-dendrite','raw/larval_fly/Winding2023_supplemental_S1.zip','Winding 2023','chemical','verify','Synaptic compartment label; threshold >=20'),
   ('larval_fly_da','Drosophila larval dendrite-to-axon','raw/larval_fly/Winding2023_supplemental_S1.zip','Winding 2023','chemical','verify','Synaptic compartment label; threshold >=20'),
   ('larval_fly_dd','Drosophila larval dendrite-to-dendrite','raw/larval_fly/Winding2023_supplemental_S1.zip','Winding 2023','chemical','verify','Synaptic compartment label; threshold >=20'),
+  ('microns_v661','Mouse visual cortex nuclei and synapse-degree static summary','raw/microns_v661/synapses_pni_2_in_out_degree.csv.gz','MICrONS historic static materialization v661','degree_metadata','verify MICrONS original terms','Not full connectome: degree metadata only; do not mix with v1926 without version reconciliation'),
   ('banc_v888_v3','Adult female Drosophila full brain and nerve cord','raw/banc/banc_888_edgelist_simple_v3.feather','BANC 888/v3','chemical','verify source rights','v3; strongest contacts indexed; cross-atlas nblast links are not neuronal identity'),
   ('banc_v888_v2_compartment','Adult female Drosophila compartment-specific brain and cord','raw/banc/banc_888_edgelist_split_v2.feather','BANC 888/v2','chemical','verify source rights','v2 compartment-specific connections; do not merge with v3'),
   ('h01_swc_fragments','Human H01 cortical 1 mm3 skeleton subset','raw/h01/104_proofread_neurons_swc.zip','H01 2021/2024','morphology','verify','3327 SWC files are fragments, not all H01 16k neurons')]:
   db.execute('INSERT INTO datasets VALUES(?,?,?,?,?,?,?,?)',(id,description,raw,ver,kind,lic,caveat,TODAY))
  db.commit()
- db.executescript('CREATE INDEX edge_source ON edges(dataset,src); CREATE INDEX edge_target ON edges(dataset,dst); CREATE INDEX edge_rank ON edges(dataset,weight DESC); CREATE INDEX neuron_lookup ON neurons(dataset,neuron_id); CREATE INDEX morph_lookup ON morphologies(dataset,fragment_id); CREATE INDEX crosswalk_lookup ON crosswalk(source_dataset,source_id);')
+ db.executescript('CREATE INDEX edge_source ON edges(dataset,src); CREATE INDEX edge_target ON edges(dataset,dst); CREATE INDEX edge_rank ON edges(dataset,weight DESC); CREATE INDEX neuron_lookup ON neurons(dataset,neuron_id); CREATE INDEX morph_lookup ON morphologies(dataset,fragment_id); CREATE INDEX crosswalk_lookup ON crosswalk(source_dataset,source_id); CREATE INDEX neuron_metric_lookup ON neuron_metrics(dataset,neuron_id);')
  db.commit()
  print('indexes done',flush=True)
  integrity=db.execute('PRAGMA quick_check').fetchone()[0]
@@ -267,6 +305,7 @@ def main():
  report['indexed_neurons']=db.execute('SELECT COUNT(*) FROM neurons').fetchone()[0]
  report['indexed_morphology_fragments']=db.execute('SELECT COUNT(*) FROM morphologies').fetchone()[0]
  report['nblast_candidate_links']=db.execute('SELECT COUNT(*) FROM crosswalk').fetchone()[0]
+ report['indexed_neuron_degree_rows']=db.execute('SELECT COUNT(*) FROM neuron_metrics').fetchone()[0]
  db.close();os.replace(temp,DB)
  json_report={'generated_at':TODAY,'source_release_dates_not_inferred_from_download_time':True,'data':report}
  (ROOT/'reports/index_report.json').write_text(json.dumps(json_report,ensure_ascii=False,indent=2)+'\n')
