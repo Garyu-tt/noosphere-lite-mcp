@@ -4,6 +4,10 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 now=datetime.datetime.now(datetime.timezone.utc).isoformat()
 origins={
+ 'microns_v661/nucleus_detection_v0_merged.csv.gz':'https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/nucleus_detection_v0_merged.csv.gz',
+ 'microns_v661/nucleus_detection_v0_merged_header.csv':'https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/nucleus_detection_v0_merged_header.csv',
+ 'microns_v661/synapses_pni_2_in_out_degree.csv.gz':'https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/synapses_pni_2_in_out_degree.csv.gz',
+ 'microns_v661/synapses_pni_2_in_out_degree_header.csv':'https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/synapses_pni_2_in_out_degree_header.csv',
  'e11/uniform_model.pt':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/model.pt',
  'e11/uniform_config.json':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/config.json',
  'e11/affs_config.json':'https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/affs/config.json',
