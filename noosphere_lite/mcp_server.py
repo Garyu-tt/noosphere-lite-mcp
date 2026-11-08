@@ -1,5 +1,5 @@
 """MCP stdio adapter; no network listener and no private Noosphere dependencies."""
-from .vault import MemoryVault
+from .vault import MemoryVault, VaultError
 from .evidence import EvidenceGate
 from .briefing import MemoryBriefings
 from .context_r02 import context as trust_context
@@ -18,7 +18,31 @@ def _search_with_provenance(vault: MemoryVault, git_guard: GitDriftGuard,
     return hits
 
 
-def run(vault: MemoryVault):
+def _bound_scope(value: str, project: str | None) -> str:
+    """Bind a scoped MCP process to the operator's project, not the caller's."""
+    if project is None:
+        return value
+    if value in ("default", project):
+        return project
+    raise VaultError("requested project/scope differs from server-bound project")
+
+
+def _bound_tags(tags: list[str] | None, project: str | None) -> list[str] | None:
+    if project is None:
+        return tags
+    if tags is not None and (not isinstance(tags, list) or
+                            any(not isinstance(tag, str) for tag in tags)):
+        raise VaultError("invalid project tags")
+    chosen = "project:" + project
+    selected = list(tags or [])
+    if any(tag.startswith("project:") and tag != chosen for tag in selected):
+        raise VaultError("cross-project tag rejected")
+    if chosen not in selected:
+        selected.append(chosen)
+    return selected
+
+
+def run(vault: MemoryVault, *, bound_project: str | None = None):
     try:
         try:
             from mcp.server.mcpserver import MCPServer as MCPApp  # MCP SDK 2.x
@@ -26,6 +50,16 @@ def run(vault: MemoryVault):
             from mcp.server.fastmcp import FastMCP as MCPApp  # MCP SDK 1.x
     except ImportError as e:
         raise RuntimeError("Install dependencies: pip install -e .") from e
+    if bound_project is not None:
+        # Never label a shared/unscoped journal as isolated. The operator must
+        # provision *distinct* journal paths AND key per project before serving.
+        from .__main__ import _PROJECT
+        if (not isinstance(bound_project, str) or
+            not _PROJECT.fullmatch(bound_project) or
+            tuple(vault.primary.parts[-2:]) != ("projects", bound_project) or
+            tuple(vault.mirror.parts[-2:]) != ("projects", bound_project) or
+            tuple(vault.key_file.parent.parts[-2:]) != ("projects", bound_project)):
+            raise VaultError("bound MCP requires distinct project-owned vault and key paths")
     app = MCPApp("noosphere-lite-mcp")
     git_guard = GitDriftGuard.configured(vault)
     evidence = EvidenceGate(vault, git_guard=git_guard)
@@ -38,7 +72,7 @@ def run(vault: MemoryVault):
                    valid_to: str | None = None,
                    observed_at: str | None = None) -> dict:
         """Persist dated memory: recorded_at is automatic; validity is explicitly sourced."""
-        return vault.add(title, body, tags, kind, source,
+        return vault.add(title, body, _bound_tags(tags, bound_project), kind, source,
                          valid_from=valid_from, valid_to=valid_to, observed_at=observed_at)
 
     @app.tool()
@@ -79,7 +113,7 @@ def run(vault: MemoryVault):
         """Legacy notes are explicitly unreviewed; strict evidence mode is opt-in."""
         return trust_context(vault, evidence, query, max_chars,
                              source_grounded_only=source_grounded_only,
-                             scope=scope, as_of=as_of,
+                             scope=_bound_scope(scope, bound_project), as_of=as_of,
                              git_guard=git_guard)
 
     @app.tool()
@@ -88,7 +122,8 @@ def run(vault: MemoryVault):
                                        max_chars: int = 10000) -> dict:
         """Strict source-matched context without unreviewed memories or inferred truth."""
         return trust_context(vault, evidence, query, max_chars,
-                             source_grounded_only=True, scope=scope, as_of=as_of)
+                             source_grounded_only=True,
+                             scope=_bound_scope(scope, bound_project), as_of=as_of)
 
     @app.tool()
     def memory_git_anchor(memory_id: str, repo_alias: str, relative_path: str) -> dict:
@@ -126,14 +161,17 @@ def run(vault: MemoryVault):
     @app.tool()
     def memory_status() -> dict:
         """Check dual encrypted journals, record count, and replica separation."""
-        return vault.status()
+        return {**vault.status(), "bound_project": bound_project,
+                "scope_policy": ("isolated_vault_per_process"
+                                 if bound_project is not None else "single_user_unscoped")}
 
     @app.tool()
     def memory_evidence_source_add(title: str, json_document: str,
                                    scope: str = "default",
                                    observed_at: str | None = None) -> dict:
         """Store structured source JSON in the encrypted journal; NOT proof of truth."""
-        return evidence.add_source(title, json_document, scope=scope,
+        return evidence.add_source(title, json_document,
+                                   scope=_bound_scope(scope, bound_project),
                                    observed_at=observed_at)
 
     @app.tool()
@@ -143,7 +181,8 @@ def run(vault: MemoryVault):
                                 valid_to: str | None = None,
                                 stale_after: str | None = None) -> dict:
         """Bind an unreviewed claim to an exact source JSON pointer. No truth promotion."""
-        return evidence.propose(fact_key, source_id, pointer, scope=scope,
+        return evidence.propose(fact_key, source_id, pointer,
+                                scope=_bound_scope(scope, bound_project),
                                 valid_from=valid_from, valid_to=valid_to,
                                 stale_after=stale_after)
 
@@ -156,7 +195,9 @@ def run(vault: MemoryVault):
     def memory_evidence_context(query: str = "", scope: str = "default",
                                 as_of: str | None = None, limit: int = 20) -> dict:
         """Only source-matched observations; conflicting or stale facts are withheld."""
-        return evidence.query(query, scope=scope, as_of=as_of, limit=limit)
+        return evidence.query(query,
+                              scope=_bound_scope(scope, bound_project),
+                              as_of=as_of, limit=limit)
 
     @app.tool()
     def memory_briefing(project: str, at: str | None = None,
@@ -167,7 +208,8 @@ def run(vault: MemoryVault):
         Project tags and evidence scope are organizational filters, NOT ACLs.
         No source match is proof of factual truth. No plaintext index is used.
         """
-        return briefings.briefing(project, at=at, limit=limit,
+        return briefings.briefing(_bound_scope(project, bound_project),
+                                  at=at, limit=limit,
                                   max_chars=max_chars,
                                   include_evidence=include_evidence)
 
@@ -178,8 +220,8 @@ def run(vault: MemoryVault):
 
         Stale records are marked; source labels are NOT Git-verified evidence.
         """
-        return briefings.by_source(project, source_ref,
-                                   limit=limit, max_chars=max_chars)
+        return briefings.by_source(_bound_scope(project, bound_project),
+                                   source_ref, limit=limit, max_chars=max_chars)
 
     app.run(transport="stdio")
 
