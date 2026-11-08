@@ -21,6 +21,11 @@ def query(dataset,neuron=None,limit=10,mode='neighbors',direction='out'):
    rows=db.execute('SELECT * FROM crosswalk WHERE source_dataset=? AND source_id=? ORDER BY score DESC LIMIT ?', (dataset,neuron,limit)).fetchall()
   else:
    rows=db.execute('SELECT * FROM crosswalk WHERE source_dataset=? ORDER BY score DESC LIMIT ?', (dataset,limit)).fetchall()
+ elif mode=='metrics':
+  if neuron:
+   rows=db.execute('SELECT * FROM neuron_metrics WHERE dataset=? AND neuron_id=? LIMIT ?',(dataset,neuron,limit)).fetchall()
+  else:
+   rows=db.execute('SELECT * FROM neuron_metrics WHERE dataset=? ORDER BY n_input+n_output DESC LIMIT ?',(dataset,limit)).fetchall()
  elif mode=='morphology':
   rows=db.execute('SELECT * FROM morphologies WHERE dataset=? ORDER BY nodes DESC LIMIT ?',(dataset,limit)).fetchall()
  elif mode=='cell':
@@ -41,7 +46,7 @@ def query(dataset,neuron=None,limit=10,mode='neighbors',direction='out'):
 
 def main():
  p=argparse.ArgumentParser(description='Query the Noosphere connectomics atlas in read-only mode')
- p.add_argument('action',choices=['list','stats','neighbors','hub','morphology','cell','crosswalk'])
+ p.add_argument('action',choices=['list','stats','neighbors','hub','morphology','cell','crosswalk','metrics'])
  p.add_argument('--dataset',default='worm_herm_chemical')
  p.add_argument('--neuron',help='Exact neuron/body ID, no float conversion')
  p.add_argument('--limit',type=int,default=10)
