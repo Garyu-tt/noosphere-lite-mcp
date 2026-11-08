@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-11-08T15:54:59.992892+00:00",
+  "recorded_at": "2026-11-08T15:59:45.552335+00:00",
   "source_commit_pins": [
     {
       "project": "drosophila-brain-model",
@@ -137,6 +137,26 @@
       "name": "raw/malecns/connectome-weights-male-cns-v1.0.feather",
       "bytes": 1051241946,
       "origin": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather"
+    },
+    {
+      "name": "raw/microns_v661/nucleus_detection_v0_merged.csv.gz",
+      "bytes": 4652471,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/nucleus_detection_v0_merged.csv.gz"
+    },
+    {
+      "name": "raw/microns_v661/nucleus_detection_v0_merged_header.csv",
+      "bytes": 131,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/nucleus_detection_v0_merged_header.csv"
+    },
+    {
+      "name": "raw/microns_v661/synapses_pni_2_in_out_degree.csv.gz",
+      "bytes": 53509144,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/synapses_pni_2_in_out_degree.csv.gz"
+    },
+    {
+      "name": "raw/microns_v661/synapses_pni_2_in_out_degree_header.csv",
+      "bytes": 111,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/synapses_pni_2_in_out_degree_header.csv"
     }
   ]
 }
