@@ -1,0 +1,162 @@
+{
+  "recorded_at": "2026-11-08T15:59:45.552335+00:00",
+  "source_commit_pins": [
+    {
+      "project": "drosophila-brain-model",
+      "commit": "91bdd1e7dcf193f3e7ca5a8933497fcef63b7960",
+      "origin": "https://github.com/philshiu/Drosophila_brain_model.git"
+    },
+    {
+      "project": "e11-open-data",
+      "commit": "0e0855aace2a44467484a8356ba25da3d7c506c1",
+      "origin": "https://github.com/e11bio/e11-open-data.git"
+    },
+    {
+      "project": "flywire-annotations",
+      "commit": "a83b2776d60d5764cef36b927f5f9679c16c47a2",
+      "origin": "https://github.com/flyconnectome/flywire_annotations.git"
+    },
+    {
+      "project": "h01-analysis",
+      "commit": "db223b8d769d8ae046f0026f12b251103f1dbab0",
+      "origin": "https://github.com/ashapsoncoe/h01.git"
+    }
+  ],
+  "files": [
+    {
+      "name": "raw/banc/banc_888_edgelist_simple_v3.feather",
+      "bytes": 359161658,
+      "origin": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_simple_v3.feather"
+    },
+    {
+      "name": "raw/banc/banc_888_edgelist_split_v2.feather",
+      "bytes": 847546546,
+      "origin": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_edgelist_split_v2.feather"
+    },
+    {
+      "name": "raw/banc/banc_888_meta.feather",
+      "bytes": 57503026,
+      "origin": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/compiled_data/banc_888/banc_888_meta.feather"
+    },
+    {
+      "name": "raw/banc/banc_fafb_783_nblast.feather",
+      "bytes": 578411098,
+      "origin": "https://storage.googleapis.com/lee-lab_brain-and-nerve-cord-fly-connectome/nblast/banc_fafb_783_nblast.feather"
+    },
+    {
+      "name": "raw/celegans/Cook2019_corrected2020.xlsx",
+      "bytes": 4188190,
+      "origin": "https://wormwiring.org/si/SI%205%20Connectome%20adjacency%20matrices%2C%20corrected%20July%202020.xlsx"
+    },
+    {
+      "name": "raw/celegans/Cook2019_synapse_lists.xlsx",
+      "bytes": 1310019,
+      "origin": "https://wormwiring.org/si/SI%203%20Synapse%20lists.xlsx"
+    },
+    {
+      "name": "raw/e11/affs_config.json",
+      "bytes": 160,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/affs/config.json"
+    },
+    {
+      "name": "raw/e11/binary_channel_model.pt",
+      "bytes": 3031146,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/binary_channel_agnostic/pred_model-tmp.pt"
+    },
+    {
+      "name": "raw/e11/enhanced_config.json",
+      "bytes": 162,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/enhanced/config.json"
+    },
+    {
+      "name": "raw/e11/synapse_excitatory_checkpoint",
+      "bytes": 44993430,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/synapses/excitatory/model_checkpoint_45000"
+    },
+    {
+      "name": "raw/e11/synapse_excitatory_model.pt",
+      "bytes": 15002272,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/synapses/excitatory/model.pt"
+    },
+    {
+      "name": "raw/e11/uniform_config.json",
+      "bytes": 595,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/config.json"
+    },
+    {
+      "name": "raw/e11/uniform_model.pt",
+      "bytes": 21178760,
+      "origin": "https://e11bio-prism.s3.amazonaws.com/ls/models/checkpoints/uniform/model.pt"
+    },
+    {
+      "name": "raw/flywire/neuron_annotations_783.tsv",
+      "bytes": 31720298,
+      "origin": "https://raw.githubusercontent.com/flyconnectome/flywire_annotations/main/supplemental_files/Supplemental_file1_neuron_annotations.tsv"
+    },
+    {
+      "name": "raw/flywire/per_neuron_neuropil_count_pre_783.feather",
+      "bytes": 16853770,
+      "origin": "https://zenodo.org/records/10676866/files/per_neuron_neuropil_count_pre_783.feather?download=1"
+    },
+    {
+      "name": "raw/flywire/proofread_connections_783.feather",
+      "bytes": 852022274,
+      "origin": "https://zenodo.org/records/10676866/files/proofread_connections_783.feather?download=1"
+    },
+    {
+      "name": "raw/flywire/proofread_root_ids_783.npy",
+      "bytes": 1114168,
+      "origin": "https://zenodo.org/records/10676866/files/proofread_root_ids_783.npy?download=1"
+    },
+    {
+      "name": "raw/h01/104_proofread_neurons_swc.zip",
+      "bytes": 59832937,
+      "origin": "https://storage.googleapis.com/h01-release/data/20210601/proofread_104/skeletons/104_proofread_neurons_swc.zip"
+    },
+    {
+      "name": "raw/hemibrain/exported-traced-adjacencies-v1.2.tar.gz",
+      "bytes": 45872577,
+      "origin": "https://storage.googleapis.com/hemibrain/v1.2/exported-traced-adjacencies-v1.2.tar.gz"
+    },
+    {
+      "name": "raw/larval_fly/Winding2023_supplemental_S1.zip",
+      "bytes": 1107380,
+      "origin": "https://raw.githubusercontent.com/brain-networks/larval-drosophila-connectome/main/Supplementary-Data-S1.zip"
+    },
+    {
+      "name": "raw/malecns/body-annotations-male-cns-v1.0.feather",
+      "bytes": 14483314,
+      "origin": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather"
+    },
+    {
+      "name": "raw/malecns/body-neurotransmitters-male-cns-v1.0.feather",
+      "bytes": 43282834,
+      "origin": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather"
+    },
+    {
+      "name": "raw/malecns/connectome-weights-male-cns-v1.0.feather",
+      "bytes": 1051241946,
+      "origin": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather"
+    },
+    {
+      "name": "raw/microns_v661/nucleus_detection_v0_merged.csv.gz",
+      "bytes": 4652471,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/nucleus_detection_v0_merged.csv.gz"
+    },
+    {
+      "name": "raw/microns_v661/nucleus_detection_v0_merged_header.csv",
+      "bytes": 131,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/nucleus_detection_v0_merged_header.csv"
+    },
+    {
+      "name": "raw/microns_v661/synapses_pni_2_in_out_degree.csv.gz",
+      "bytes": 53509144,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/synapses_pni_2_in_out_degree.csv.gz"
+    },
+    {
+      "name": "raw/microns_v661/synapses_pni_2_in_out_degree_header.csv",
+      "bytes": 111,
+      "origin": "https://storage.googleapis.com/mat_dbs/public/minnie65_phase3_v1/v661/synapses_pni_2_in_out_degree_header.csv"
+    }
+  ]
+}

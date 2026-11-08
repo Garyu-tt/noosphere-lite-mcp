@@ -1,0 +1,8 @@
+raw/
+sources/
+.venv/
+normalized/
+reports/
+__pycache__/
+*.part
+*.partial
