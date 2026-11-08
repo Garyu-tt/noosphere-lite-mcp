@@ -57,8 +57,9 @@ class EvidenceGate:
     authenticated authorization; no public claim approval endpoint is provided.
     """
 
-    def __init__(self, vault: MemoryVault):
+    def __init__(self, vault: MemoryVault, git_guard=None):
         self.vault = vault
+        self.git_guard = git_guard
 
     def add_source(self, title: str, json_document: str, *,
                    observed_at: str | None = None, scope: str = "default") -> dict:
@@ -176,6 +177,12 @@ class EvidenceGate:
                     node = snap.nodes.get(parent)
                     if not node or node.get("archived") or node.get("status") != "current":
                         return False
+                    # Git-linked evidence must validate against the live local
+                    # worktree every time, even before any scheduled scan.
+                    if node.get("kind") == "git_anchor":
+                        if (self.git_guard is None or
+                                self.git_guard.inspect_anchor(node).get("status") != "current"):
+                            return False
                     queue.append(parent)
             return True
 

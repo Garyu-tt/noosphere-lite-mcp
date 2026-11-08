@@ -13,7 +13,8 @@ from .vault import MemoryVault, VaultError
 
 def context(vault: MemoryVault, evidence: EvidenceGate, query: str,
             max_chars: int = 10000, *, source_grounded_only: bool = False,
-            scope: str = "default", as_of: str | None = None) -> dict:
+            scope: str = "default", as_of: str | None = None,
+            git_guard=None) -> dict:
     if type(source_grounded_only) is not bool:
         raise VaultError("source_grounded_only must be boolean")
     if type(max_chars) is not int or not 500 <= max_chars <= 40000:
@@ -50,9 +51,20 @@ def context(vault: MemoryVault, evidence: EvidenceGate, query: str,
     if as_of is not None:
         raise VaultError("historical context requires source_grounded_only=true")
     result = vault.context(query, max_chars)
+    kept, drifted = [], 0
     for memory in result["memories"]:
         memory["evidence_status"] = "unreviewed_legacy_memory"
         memory["truth_guaranteed"] = False
+        if git_guard is not None:
+            observed = git_guard.status(memory["id"])
+            memory["git_provenance"] = observed["status"]
+            if observed["status"] == "stale_needs_review":
+                drifted += 1
+                continue
+        kept.append(memory)
+    result["memories"] = kept
+    result["git_drift_withheld"] = drifted
+    result["needs_review"] += drifted
     return {
         **result, "mode": "legacy_unreviewed",
         "truth_guaranteed": False,
