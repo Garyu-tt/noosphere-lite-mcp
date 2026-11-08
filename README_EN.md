@@ -96,6 +96,12 @@ Hosted ChatGPT use may require a separately supported MCP bridge; this local con
 
 The [reviewed_plasticity reference implementation](examples/reviewed_plasticity/README.md) demonstrates sparse link-utility weights, explicit independent QA attribution, SHA-256 evidence checks, idempotent feedback, and rollback. **It is not integrated into Lite MCP 0.3.0 or its encrypted NLV1 journal**, and does not change LLM model parameters. The optional SQLite sidecar is unencrypted and requires an authenticated host-side reviewer workflow before production use.
 
+## Experimental provenance-aware temporal memory (R01)
+
+The independent [memory synthesis example](examples/memory_synthesis/README.md) demonstrates Git/SHA-256 source freshness, source-checked quotations, temporal facts and historical recall, scoped supersession, negative knowledge, session briefs and SQLite FTS5 search. A [dated catalog of 27 research candidates](docs/research-memory-candidates-2026-11-08.md) credits Agents Remember, Daimon, Primnox and Engram and records their license boundaries.
+
+**This is not part of the encrypted Lite 0.3.0 core.** The example uses plaintext SQLite and must not be used with confidential data. Professional forums, internal orchestration and administrative facilities are not included.
+
 ## What it does not do yet
 
 Search is lexical, not embeddings or semantic LLM retrieval. Dependencies must be explicitly linked; neither factual truth nor contradictory evidence is automatically verified. Automatic relevance aging, semantic retrieval, conflict resolution, history compaction, per-agent permissions and offsite backup integration are on the roadmap.
