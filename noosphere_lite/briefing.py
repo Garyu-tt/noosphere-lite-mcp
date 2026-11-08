@@ -55,7 +55,7 @@ def _validity(node: dict, at: datetime, historical: bool) -> str:
             return "outside_validity"
         if end is not None and datetime.fromisoformat(_utc_instant(end)) <= at:
             return "outside_validity"
-    except (ValueError, TypeError, OverflowError):
+    except (ValueError, TypeError, OverflowError, VaultError):
         return "malformed_validity"
     return "eligible"
 
@@ -85,7 +85,7 @@ def _sort_time(node: dict):
     try:
         value = _utc_instant(node.get("recorded_at") or node.get("created"))
         return datetime.fromisoformat(value).timestamp() if value else 0.0
-    except (ValueError, TypeError, OverflowError, OSError):
+    except (ValueError, TypeError, OverflowError, OSError, VaultError):
         return 0.0
 
 
@@ -159,7 +159,7 @@ class MemoryBriefings:
             evidence_budget = max_chars - used - 1800
             source_matched, dropped_evidence, _ = _pack(
                 gate["facts"], max(0, evidence_budget), limit)
-        return {
+        result = {
             "project": project,
             "at": when,
             "records": selected,
@@ -173,16 +173,33 @@ class MemoryBriefings:
                 "review_candidates": len(review_required),
                 "review_omitted": omitted_reviews,
                 "evidence_omitted": dropped_evidence,
+                "gate_truncated": bool(gate["truncated"]) if gate else False,
                 "excluded_outside_validity": omitted_invalid.get("outside_validity",0),
                 "evidence_rejected_by_gate": gate["rejected"] if gate else {},
             },
-            "truncated": bool(omitted or omitted_reviews or dropped_evidence),
+            "truncated": bool(omitted or omitted_reviews or dropped_evidence
+                              or (gate and gate["truncated"])),
             "warning": (
                 "Project tag and evidence scope are filters, not ACLs. "
                 "Ordinary memory notes are unreviewed; source-matched evidence is "
                 "not independent truth verification. No host files were read."
             ),
         }
+        # Hard bound the serialized response, never truncate an invariant's text.
+        while len(json.dumps(result, ensure_ascii=False)) > max_chars:
+            for field, counter in (
+                ("source_matched_unreviewed", "evidence_omitted"),
+                ("records", "record_omitted"),
+                ("review_required", "review_omitted"),
+            ):
+                if result[field]:
+                    result[field].pop()
+                    result["counts"][counter] += 1
+                    result["truncated"] = True
+                    break
+            else:
+                raise VaultError("response cannot fit max_chars")
+        return result
 
     def by_source(self, project: str, source_ref: str, *,
                   limit: int = 20, max_chars: int = 12_000) -> dict:
@@ -204,7 +221,7 @@ class MemoryBriefings:
                  "needs_review": n.get("status", "current") != "current"}
                 for n in matched]
         selected, omitted, _ = _pack(rows, max_chars - 500, limit)
-        return {
+        result = {
             "project": project,
             "source_ref": source_ref,
             "records": selected,
@@ -217,3 +234,10 @@ class MemoryBriefings:
                 "Git check or proof of source freshness. Review stale notes."
             ),
         }
+        while len(json.dumps(result, ensure_ascii=False)) > max_chars:
+            if not result["records"]:
+                raise VaultError("response cannot fit max_chars")
+            result["records"].pop()
+            result["omitted"] += 1
+            result["truncated"] = True
+        return result
