@@ -495,6 +495,8 @@ class MemoryVault:
             old = state.nodes.get(memory_id)
             if not old or old.get("archived"):
                 raise VaultError("memory not found")
+            if old.get("kind") in ("evidence_claim", "evidence_tombstone"):
+                raise VaultError("evidence claims and rejection tombstones are immutable")
             at = _stamp()
             updated = dict(old, body=body, updated=at, status="current")
             if valid_from is not None or valid_to is not None:
@@ -513,7 +515,9 @@ class MemoryVault:
         return result
 
     def archive(self, memory_id: str) -> dict:
-        self.read(memory_id)
+        node = self.read(memory_id)
+        if node.get("kind") == "evidence_tombstone":
+            raise VaultError("rejection tombstones cannot be archived")
         self._append(dict(op="archive", id=memory_id, at=_stamp()))
         return {"archived": True, "warning": "archived records remain in encrypted event history"}
 
