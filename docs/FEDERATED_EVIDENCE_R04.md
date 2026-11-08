@@ -75,3 +75,31 @@ benchmarks or proof of the semantic accuracy of upstream material.
 
 This module is portable open-source functionality. Private agents and
 professional operational tooling are not part of the public repository.
+
+## Compact incremental overlay (R04)
+
+The portable `noosphere_lite/federation_overlay.py` can atomically build a small
+SQLite sidecar from three read-only input databases: observed live links,
+static semantic functions/calls, and programming-capability hubs. A cheap source
+fingerprint prevents redundant rebuilds; source changes rebuild only the
+sidecar, not an unrelated large knowledge graph. The code does not contain
+or require private infrastructure paths, tokens, workers, or network access.
+
+Example in a permitted local environment:
+
+```python
+from pathlib import Path
+from noosphere_lite.federation_overlay import build, search, neighbors
+receipt = build(Path('overlay.sqlite3'), Path('observed-links.sqlite3'),
+                Path('semantic-code.sqlite3'), Path('code-catalog.sqlite3'))
+results = search(Path('overlay.sqlite3'), 'sqlite', layer='federated')
+```
+
+The caller must define proper access controls for its own observations and
+perform authoritative fact validation separately. `search` and `neighbors`
+return unverified evidence, not machine-validated truth. The overlay is
+rebuildable and has no write access to source databases.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_federation*.py' -v
+```
