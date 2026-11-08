@@ -444,8 +444,9 @@ class MemoryVault:
                       status=state.nodes[i].get("status", "current")) for i in discovered]
         return {"nodes": nodes, "links": edges[:800]}
 
-    def context(self, query: str, max_chars: int = 10_000) -> dict:
-        state = self._snapshot()
+    def context(self, query: str, max_chars: int = 10_000, *,
+                _snapshot: Snapshot | None = None) -> dict:
+        state = _snapshot if _snapshot is not None else self._snapshot()
         results = self.search(query, 16, _snapshot=state)
         budget = max(500, min(max_chars, 40_000))
         selected = []
