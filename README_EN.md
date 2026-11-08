@@ -133,3 +133,7 @@ Original project code in this release: **GNU GPL-3.0-or-later**. Copyright (C) 2
 The `memory_suggest_links` MCP tool proposes **unverified** possible links using bounded lexical overlap across titles, tags, and text. It never changes the encrypted journal, never claims inferred relations are true, and excludes direct links and archived records. Review source evidence and test applicability before calling `memory_link`. This is **not** semantic vector retrieval, automatic skill transfer, or validated precision/recall.
 
 An exploratory benchmark from the owner's much larger private metagraph is published under `benchmarks/discovery-pilot-2026-11-08/`; **those measurements are not performance figures for Lite**. The benchmark makes the limits explicit and includes a synthetic, privacy-safe regression test.
+
+### Evidence-first context R02 (2026-11-08)
+
+Normal `memory_search` and `memory_context` results are now explicitly labelled as unreviewed notes. For source-matched observations only, use `memory_source_grounded_context` or `memory_context(..., source_grounded_only=true)`. Strict mode cannot silently fall back to legacy notes; evidence equality is not world truth. See [R02 documentation](docs/EVIDENCE_CONTEXT_R02.md).
