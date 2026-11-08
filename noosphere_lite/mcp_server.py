@@ -48,6 +48,16 @@ def run(vault: MemoryVault):
         return vault.context(query, max_chars)
 
     @app.tool()
+    def memory_revise(memory_id: str, body: str, title: str | None = None) -> dict:
+        """Revise a source memory; descendants using derived_from become stale."""
+        return vault.revise(memory_id, body, title)
+
+    @app.tool()
+    def memory_invalidate(memory_id: str, reason: str = "Source no longer verified") -> dict:
+        """Cascade stale status to downstream conclusions without erasing history."""
+        return vault.invalidate(memory_id, reason)
+
+    @app.tool()
     def memory_archive(memory_id: str) -> dict:
         """Hide a memory; encrypted event history retains it."""
         return vault.archive(memory_id)

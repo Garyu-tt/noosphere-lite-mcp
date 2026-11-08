@@ -66,6 +66,40 @@ class VaultTests(unittest.TestCase):
         with self.assertRaises(VaultError):
             strict.status()
 
+    def test_cascading_staleness_on_source_revision(self):
+        source = self.vault.add("Original observation", "first version", ["fact"], "source")
+        conclusion = self.vault.add("Conclusion", "depends on source", ["inference"], "fact")
+        next_conclusion = self.vault.add("Derived conclusion", "depends on conclusion", ["inference"], "fact")
+        unrelated = self.vault.add("Unrelated", "stays current")
+        self.vault.link(conclusion["id"], source["id"], "derived_from")
+        self.vault.link(next_conclusion["id"], conclusion["id"], "derived_from")
+        result = self.vault.revise(source["id"], "second version")
+        self.assertEqual(result["downstream_stale"], 2)
+        self.assertEqual(self.vault.read(source["id"])["status"], "current")
+        self.assertEqual(self.vault.read(conclusion["id"])["status"], "stale")
+        self.assertEqual(self.vault.read(next_conclusion["id"])["status"], "stale")
+        self.assertEqual(self.vault.read(unrelated["id"])["status"], "current")
+        self.assertEqual(self.vault.context("conclusion")["needs_review"], 2)
+        self.assertEqual(self.vault.status()["events"], 7)
+
+    def test_explicit_invalidation_and_revalidation(self):
+        source = self.vault.add("Original fact", "v1")
+        derived = self.vault.add("Summarization", "v1")
+        self.vault.link(derived["id"], source["id"], "derived_from")
+        result = self.vault.invalidate(source["id"], "source withdrawn")
+        self.assertEqual(result["stale_count"], 2)
+        self.assertIn("source withdrawn", self.vault.read(derived["id"])["stale_reason"])
+        self.vault.revise(derived["id"], "independently rechecked")
+        self.assertEqual(self.vault.read(derived["id"])["status"], "current")
+        self.assertEqual(self.vault.read(source["id"])["status"], "stale")
+
+    def test_dependency_loop_is_bounded(self):
+        a = self.vault.add("A", "a")
+        b = self.vault.add("B", "b")
+        self.vault.link(a["id"], b["id"], "derived_from")
+        self.vault.link(b["id"], a["id"], "derived_from")
+        self.assertEqual(self.vault.invalidate(a["id"])["stale_count"], 2)
+
     def test_no_overwrite_existing_journals(self):
         with self.assertRaises(VaultError):
             self.vault.initialize()

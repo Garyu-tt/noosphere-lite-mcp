@@ -1,48 +1,134 @@
 # Noosphere Lite MCP
 
-Independent, Linux-native long-term memory for MCP-compatible AI agents.
+**Память для ИИ, которой не нужно помещаться в контекстное окно.**
 
-**This is a new, separate implementation, not a reduced source dump or a parser for a private Noosphere deployment.** It shares general ideas (memory on demand, links, agent-independent state), not private storage layout, file tags, schemas, API routes, or decoding procedures.
+*Автор — Лёха · Версия 0.2.0 · Linux / Python / MCP · MIT License*
 
-## Features
+[English documentation](README_EN.md)
 
-- Store notes, decisions, tasks, observations, and source references.
-- Text search with ranked results; retrieve full content by random ID only when needed.
-- Typed, directed links and bounded 1–3-hop graph exploration.
-- Retrieval into a bounded working context for the model.
-- AES-256-GCM encrypted, append-only event journal with chained authenticated frames.
-- Mirrored, integrity-checked, recoverable journal copies. Independent filesystem mountpoints required by default.
-- Local MCP stdio interface: 9 tools, no HTTP listener, arbitrary file reads, code execution, or shell access.
-- Synthetic tests only: no production data, credentials, private parsers, or network configurations.
+---
 
-## Install on Linux (Python 3.11+)
+## Что это вообще такое?
 
+Представь: ты несколько недель разрабатываешь проект с нейросетью. Вы находите ошибки, принимаете решения, меняете архитектуру, проверяете гипотезы. А потом начинается новый диалог, и половину проделанной работы приходится объяснять заново.
+
+**Noosphere Lite — долговременная память, которая живёт отдельно от агента.** Это не ещё одна языковая модель, не бесконечный чат и не каталог текстовых файлов. Это хранилище знаний, их истории и взаимосвязей. Агент подключается к нему через MCP, получает ровно ту информацию, которая нужна в текущий момент, и продолжает работу.
+
+Память принадлежит не конкретной сессии. Один агент сохранил решение сегодня; другой может найти его через неделю. Не нужно пытаться запихнуть в промпт весь архив: **контекстное окно становится рабочим столом, а не складом.**
+
+## Что умеет Lite
+
+### Память по требованию
+
+У агента есть несколько способов вспомнить необходимое: найти подходящие записи, получить краткие результаты, прочитать одну запись целиком, пройти по связанным узлам или собрать ограниченный объём контекста под задачу. Всё остальное в контекст не попадает.
+
+### Граф вместо мешка заметок
+
+Каждая запись — отдельный узел: идентификатор, заголовок, текст, тип, теги, ссылка на источник и время изменений. Узлы можно связывать именованными направленными отношениями: например, **related**, **supports**, **blocks**, **derived_from**.
+
+По графу можно ходить на глубину от одного до трёх переходов. Содержимое записей не обязано загружаться вместе с картой связей. Можно сначала найти путь, а затем открыть нужный узел.
+
+### Каскадное устаревание
+
+Это важнее, чем кажется. Если однажды сохранённый факт изменился, старые выводы, построенные на нём, нельзя продолжать выдавать как актуальные.
+
+Пример:
+
+    Измерение A
+       ↑ derived_from
+    Вывод B
+       ↑ derived_from
+    Решение C
+
+Если пересмотреть A, Lite автоматически пометит B и C как **stale** — «требует повторной проверки». Если явно признать A недостоверным, устареет вся цепочка: A, B и C. История при этом остаётся на месте.
+
+Система не пытается самостоятельно придумать новую истину и не удаляет неудобные результаты. Она честно сообщает агенту: «этот вывод опирался на сведения, которые уже изменились».
+
+Каскад работает по **явным** связям derived_from. Lite пока не угадывает такие зависимости самостоятельно. Статус **current** означает «не помечено устаревшим», а не «достоверность доказана».
+
+### История изменений
+
+Ноосфера не должна забывать, *почему* возникло то или иное решение. Новые изменения записываются событиями, а предыдущие состояния остаются в истории. Даже архивация не уничтожает старую запись из зашифрованного журнала — лишь скрывает её из обычной выдачи.
+
+Поэтому память подходит не только для хранения ответов, но и для накопления опыта: наблюдение → вывод → решение → пересмотр.
+
+### Хранение: отдельно граф, отдельно события
+
+Внутри Lite четыре слоя:
+
+    ИИ-агент
+        │ MCP-запрос
+        ▼
+    Поиск и выборка контекста
+        │
+        ▼
+    Рабочий граф в оперативной памяти
+        │
+        ▼
+    Зашифрованный журнал событий
+        ├─ основная копия
+        └─ зеркальная копия
+
+В постоянном хранилище используется собственный **бинарный журнал NLV1**, зашифрованный с AES-256-GCM. В нём последовательно фиксируются события: создание записи, связь, изменение, устаревание, архивация.
+
+Рабочий граф восстанавливается в оперативной памяти. Постоянного открытого JSON-файла с полезными данными или незашифрованного поискового индекса нет.
+
+Это сознательно простой движок: поиск пока **лексический**, а не векторный. Эмбеддинги, нейронное извлечение смысла и автоматическое понимание противоречий — направления развития, а не функции версии 0.2.0.
+
+### Защита и две копии
+
+Каждое событие аутентифицируется и связывается с предыдущим через хеш. Изменение или повреждение журнала обнаруживается при чтении. Две копии сверяются; если одна повреждена или отстала, её можно восстановить по исправной.
+
+По умолчанию копии должны находиться **на разных файловых системах**. Ключ шифрования хранится отдельно, с доступом только владельцу. Ключ тоже необходимо безопасно резервировать: потеря всех его экземпляров означает потерю доступа ко всей памяти.
+
+Два зеркала не заменяют независимую внешнюю резервную копию. А если злоумышленник получил доступ к работающей пользовательской сессии и ключу, шифрование диска уже не решает проблему за тебя.
+
+### Универсальный интерфейс
+
+Lite работает локально на Linux и не требует облака, GPU или собственной нейросети. Агент получает память через MCP. В комплекте локальный сервер **stdio**, без открытого HTTP-порта, запуска команд и доступа к произвольным файлам компьютера.
+
+Это память для совместимого агента, а не агент, который тайком управляет системой.
+
+## Как это выглядит в работе
+
+Ты сохранил решение о конфигурации сервера и связал его с исходным тестом. Через месяц новый агент возвращается к проекту: находит решение, открывает его источник и связанные заметки, восстанавливает ход мысли.
+
+А если исходный тест за это время оказался неправильным, все выводы, которые явно от него зависели, уже будут помечены для перепроверки.
+
+**Смысл не в том, чтобы помнить больше текста. Смысл — не терять причинно-следственные связи между уже проделанными действиями.**
+
+## Установка на Linux
+
+Нужен Python 3.11 или новее.
+
+    git clone https://github.com/Garyu-tt/noosphere-lite-mcp.git
+    cd noosphere-lite-mcp
     python3 -m venv .venv
-    . .venv/bin/activate
+    source .venv/bin/activate
     pip install -e .
 
-Configure primary and mirror on distinct storage filesystems. A second folder on the same device is not a real backup:
+Подключи две независимые файловые системы под хранилище и настрой пути:
 
     export NSL_PRIMARY=/mnt/storage-a/noosphere-lite
     export NSL_MIRROR=/mnt/storage-b/noosphere-lite
-    export NSL_KEY_FILE=$HOME/.config/noosphere-lite/key
+    export NSL_KEY_FILE="$HOME/.config/noosphere-lite/key"
+
     python -m noosphere_lite init
     python -m noosphere_lite status
+    python -m noosphere_lite mcp
 
-Initialization creates a private 32-byte local key file (0600) and two AES-GCM journals (0600). Data directories must be private (0700). Back up the key separately through an offline secure channel: losing every key copy permanently loses access to the vault. Same-user OS compromise can access the key; encryption does not protect against a compromised live agent or user session.
+Каталоги хранилища должны иметь права 0700; ключ и журналы — 0600. Инициализация не перезаписывает существующие журналы.
 
-For a disposable demo on a single filesystem ONLY, add --development-same-device to commands, or set NSL_DEVELOPMENT_SAME_DEVICE=1. This bypasses redundancy requirements and is not acceptable for important data.
+**Только для тестов на одном диске** можно указать переменную NSL_DEVELOPMENT_SAME_DEVICE=1. Это отключает проверку независимости копий и не подходит для ценных данных.
 
-## MCP client
+### Настройка MCP-клиента
 
-Start with python -m noosphere_lite mcp.
-
-Example for an MCP host that accepts stdio server configuration:
+Для клиентов, поддерживающих локальный stdio MCP, пример конфигурации:
 
     {
       "mcpServers": {
         "noosphere-lite": {
-          "command": "/absolute/path/to/.venv/bin/python",
+          "command": "/absolute/path/noosphere-lite-mcp/.venv/bin/python",
           "args": ["-m", "noosphere_lite", "mcp"],
           "env": {
             "NSL_PRIMARY": "/mnt/storage-a/noosphere-lite",
@@ -53,46 +139,37 @@ Example for an MCP host that accepts stdio server configuration:
       }
     }
 
-This is an MCP server, not automatically an installable ChatGPT custom GPT or OpenAI-hosted connector. Use with ChatGPT only through an authorized compatible MCP client/bridge. Never expose raw stdio or a vault over an unauthenticated public network endpoint.
+Это пример для совместимых локальных MCP-хостов. Интерфейс ChatGPT может требовать отдельно поддерживаемый мост; конфигурация stdio сама по себе не устанавливает облачный коннектор.
 
-## MCP tools
+## 11 инструментов MCP
 
-- memory_add: store a note or decision.
-- memory_search: find relevant memories without full payloads.
-- memory_read: retrieve one selected payload.
-- memory_link and memory_unlink: typed relationships.
-- memory_neighborhood: bounded navigation across connected memories.
-- memory_context: assemble a compact task-specific context.
-- memory_archive: hide from regular retrieval, retaining encrypted history.
-- memory_status: integrity and replica status.
+| Инструмент | Что делает |
+| --- | --- |
+| **memory_add** | Сохраняет заметку, факт, решение или задачу |
+| **memory_search** | Ищет подходящие воспоминания |
+| **memory_read** | Возвращает конкретную запись целиком |
+| **memory_context** | Собирает ограниченный контекст для задачи |
+| **memory_link / memory_unlink** | Создаёт и удаляет типизированные связи |
+| **memory_neighborhood** | Обходит соседние узлы |
+| **memory_revise** | Обновляет запись и помечает зависимые выводы как устаревшие |
+| **memory_invalidate** | Запускает каскадное устаревание от выбранной записи |
+| **memory_archive** | Скрывает запись, не стирая историю |
+| **memory_status** | Проверяет журналы и статистику |
 
-Search is local lexical retrieval, not local model inference, vector search, or autonomous semantic extraction. Relationships are explicitly entered, not automatically hallucinated.
+## Чего пока нет
 
-## Architecture and security
+В дальнейших версиях хочется добавить автоматическое обнаружение зависимостей, векторный и семантический поиск, уровни значимости памяти, управление давностью и сроками хранения, согласование конфликтующих источников, уплотнение истории, разделение прав между агентами и внешние резервные копии.
 
-On disk this uses a private-to-this-project NLV1 binary event stream, not a JSON graph, SQL table schema, or adapter for the owner's internal Noosphere. The entire event content is AES-256-GCM encrypted with unique per-frame nonces. Authentication binds each event to its sequence and preceding event digest. Random UUIDs do not embed host paths or private project identifiers.
+**В 0.2.0 этого пока нет.** Текущий движок рассчитан на один хост и одного пишущего процесса с блокировкой, а не на распределённый кластер. Журнал при запросах перечитывается, поэтому большие базы потребуют отдельной оптимизации. Текущий лимит — 150 000 событий, а не 150 000 узлов.
 
-The stream is decrypted only in local process memory. Search indices are transient; no plaintext content is written as a search cache. Ciphertext lengths, total file size and timing remain observable metadata.
-
-Each journal is validated at read/write. If one copy is damaged or behind, a valid matching-prefix journal is mirrored to the other. Divergent histories fail closed. Cross-device writes cannot be atomically committed together; after a crash, the next successful open reconciles prefixes. If both copies are lost/corrupted, data may be lost. Two mirrored disks are not equivalent to offsite, immutable, versioned backups.
-
-This is a single-host, single-writer design using flock; it is not a distributed database or a clustered multi-writer protocol. Mountpoints on different filesystems do not prove different physical disks if storage is virtualized. The maximum journal length is currently 150,000 events; benchmark before scaling up.
-
-IMPORTANT: memory_archive only hides content from queries. Historical encrypted events are retained in the append-only journal. This is not a cryptographic erasure operation. Data deletion policies require a separate audited compaction, key rotation, and backup retention plan.
-
-Do not commit encryption keys, private vault journals, production graph exports, tokens, internal Noosphere format documentation or infrastructure addresses.
-
-## Tests
+## Проверка
 
     python -m unittest discover -s tests -v
 
-## Scope
+Тесты покрывают шифрование, обнаружение повреждений, восстановление копии, связи и многоуровневое каскадное устаревание. Подключение локального MCP-клиента проверено на синтетических данных.
 
-Deliberately excludes proprietary storage formats, private graph translators, autonomous agent orchestration, internal source connectors, role escalation and automatic writes to host projects. This is a genuinely separate implementation with common high-level features, not compatibility with any private deployment.
+---
 
-Planned: stronger query ranking and measured search benchmarks, encrypting compaction, external key manager support, per-agent read-only permissions, offsite backup integration, and a verified client integration test.
+**Noosphere Lite MCP — чтобы новый разговор не означал новое начало.**
 
-## License
-
-MIT; see LICENSE.
-
+*Лёха · MIT License · [English documentation](README_EN.md)*

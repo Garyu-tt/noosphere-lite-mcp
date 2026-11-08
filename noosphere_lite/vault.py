@@ -183,6 +183,25 @@ class MemoryVault:
         elif op == "archive":
             if event["id"] in nodes:
                 nodes[event["id"]] = {**nodes[event["id"]], "archived": True}
+        elif op == "mark_stale":
+            for memory_id in event["ids"]:
+                if memory_id in nodes:
+                    nodes[memory_id] = {
+                        **nodes[memory_id], "status": "stale",
+                        "stale_reason": event["reason"], "stale_at": event["at"]
+                    }
+        elif op == "revise":
+            data = event["node"]
+            if data["id"] not in nodes:
+                raise VaultError("revised memory does not exist")
+            nodes[data["id"]] = data
+            for memory_id in event["stale_ids"]:
+                if memory_id in nodes:
+                    nodes[memory_id] = {
+                        **nodes[memory_id], "status": "stale",
+                        "stale_reason": "Upstream memory revised",
+                        "stale_at": event["at"]
+                    }
         else:
             raise VaultError("unrecognized journal event")
 
@@ -240,15 +259,17 @@ class MemoryVault:
                 _atomic_write(root / "journal.nlv", chosen[0])
         return chosen[1]
 
-    def _append(self, event: dict) -> None:
-        payload = json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode()
-        if len(payload) > MAX_BODY:
-            raise VaultError("event too large")
+    def _append(self, event) -> None:
         with self._lock():
             key = self._key()
             state = self._reconcile(key)
             if state.seq >= MAX_EVENTS:
                 raise VaultError("maximum event count reached")
+            if callable(event):
+                event = event(state)
+            payload = json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode()
+            if len(payload) > MAX_BODY:
+                raise VaultError("event too large")
             if event["op"] in ("link", "unlink"):
                 if event["from"] not in state.nodes or event["to"] not in state.nodes:
                     raise VaultError("relationship points to missing memory")
@@ -285,7 +306,7 @@ class MemoryVault:
         when = _stamp()
         node = dict(id=uuid.uuid4().hex, title=title.strip(), body=body,
                     tags=tags, kind=kind[:32], source=source[:500],
-                    created=when, updated=when, archived=False)
+                    created=when, updated=when, archived=False, status="current")
         self._append(dict(op="put", node=node))
         return dict(id=node["id"], title=node["title"], created=when)
 
@@ -316,7 +337,8 @@ class MemoryVault:
                 scored.append((score, node))
         scored.sort(key=lambda x: (-x[0], x[1]["id"]))
         return [dict(id=n["id"], title=n["title"], tags=n["tags"], kind=n["kind"],
-                     snippet=n["body"][:220], score=s) for s,n in scored[:max(1, min(limit,50))]]
+                     snippet=n["body"][:220], status=n.get("status", "current"),
+                     score=s) for s,n in scored[:max(1, min(limit,50))]]
 
     def link(self, from_id: str, to_id: str, relation: str = "related") -> dict:
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", relation):
@@ -349,7 +371,8 @@ class MemoryVault:
             if len(edges) >= max(1, min(limit,200)) * 4:
                 break
         nodes = [dict(id=i, title=state.nodes[i]["title"],
-                      kind=state.nodes[i]["kind"]) for i in discovered]
+                      kind=state.nodes[i]["kind"],
+                      status=state.nodes[i].get("status", "current")) for i in discovered]
         return {"nodes": nodes, "links": edges[:800]}
 
     def context(self, query: str, max_chars: int = 10_000) -> dict:
@@ -366,7 +389,64 @@ class MemoryVault:
                 break
             selected.append(node)
             budget -= size
-        return {"query": query, "memories": selected, "truncated": len(selected) < len(results)}
+        return {"query": query, "memories": selected,
+                "needs_review": sum(m.get("status") == "stale" for m in selected),
+                "truncated": len(selected) < len(results)}
+
+    @staticmethod
+    def _downstream(state: Snapshot, origin: str) -> list[str]:
+        """Transitively follow child --derived_from--> parent dependencies."""
+        reverse = {}
+        for child, parent, relation in state.links:
+            if relation == "derived_from":
+                reverse.setdefault(parent, set()).add(child)
+        seen = {origin}
+        queue = [origin]
+        for parent in queue:
+            for child in sorted(reverse.get(parent, ())):
+                if child not in seen:
+                    seen.add(child)
+                    queue.append(child)
+        seen.discard(origin)
+        return sorted(seen)
+
+    def invalidate(self, memory_id: str, reason: str = "Source no longer verified") -> dict:
+        """Mark this memory and all of its derived descendants stale. Never delete history."""
+        if not 1 <= len(reason.strip()) <= 512:
+            raise VaultError("reason must be 1..512 characters")
+        result = {}
+        def make_event(state: Snapshot) -> dict:
+            if memory_id not in state.nodes or state.nodes[memory_id].get("archived"):
+                raise VaultError("memory not found")
+            ids = [memory_id] + self._downstream(state, memory_id)
+            result["stale_ids"] = ids
+            return {"op": "mark_stale", "ids": ids, "reason": reason.strip(), "at": _stamp()}
+        self._append(make_event)
+        return {"stale_count": len(result["stale_ids"]), **result}
+
+    def revise(self, memory_id: str, body: str, title: str | None = None) -> dict:
+        """Update a source record and automatically stale downstream derived memories."""
+        if not isinstance(body, str) or len(body) > 48_000:
+            raise VaultError("invalid body")
+        if title is not None and (not isinstance(title, str) or not 1 <= len(title.strip()) <= 256):
+            raise VaultError("invalid title")
+        result = {}
+        def make_event(state: Snapshot) -> dict:
+            old = state.nodes.get(memory_id)
+            if not old or old.get("archived"):
+                raise VaultError("memory not found")
+            at = _stamp()
+            updated = dict(old, body=body, updated=at, status="current")
+            updated.pop("stale_reason", None)
+            updated.pop("stale_at", None)
+            if title is not None:
+                updated["title"] = title.strip()
+            stale_ids = self._downstream(state, memory_id)
+            result.update({"id": memory_id, "updated": at, "downstream_stale": len(stale_ids)})
+            return {"op": "revise", "node": updated,
+                    "stale_ids": stale_ids, "at": at}
+        self._append(make_event)
+        return result
 
     def archive(self, memory_id: str) -> dict:
         self.read(memory_id)
