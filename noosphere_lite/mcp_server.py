@@ -173,5 +173,35 @@ def run(vault: MemoryVault):
         return briefings.by_source(project, source_ref,
                                    limit=limit, max_chars=max_chars)
 
+    # Explicit opt-in: peer registry is private local cached metadata, never
+    # a default network crawler or a trusted source of executable instructions.
+    import os
+    peer_db = os.environ.get("NSL_PEER_DB")
+    if peer_db:
+        import sqlite3
+        from pathlib import Path
+        from .peer_bridge import PeerError, search_skills, read_skill
+
+        @app.tool()
+        def peer_skill_search(query: str, limit: int = 10) -> list[dict]:
+            """Read cached untrusted reviewed Skill metadata, no execution."""
+            with sqlite3.connect(
+                "file:" + str(Path(peer_db).resolve()) + "?mode=ro", uri=True
+            ) as db:
+                return search_skills(db, query, limit)
+
+        @app.tool()
+        def peer_skill_get(name: str, version: str | None = None) -> dict:
+            """Explicit retrieval with SHA-256 and size check. Never auto-apply."""
+            with sqlite3.connect(
+                "file:" + str(Path(peer_db).resolve()) + "?mode=ro", uri=True
+            ) as db:
+                entries = [e for e in search_skills(db, "", 50)
+                           if e["name"] == name
+                           and (version is None or e["version"] == version)]
+            if len(entries) != 1:
+                raise PeerError("no active matching Skill in local peer cache")
+            return read_skill(entries[0])
+
     app.run(transport="stdio")
 

@@ -19,4 +19,5 @@ include = ["noosphere_lite*"]
 
 [project.scripts]
 noosphere-lite = "noosphere_lite.__main__:main"
+noosphere-peers = "noosphere_lite.peer_cli:main"
 
