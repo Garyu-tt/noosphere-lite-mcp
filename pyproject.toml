@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noosphere-lite-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Linux-native MCP memory with encrypted mirrored journals and links"
 license = "GPL-3.0-or-later"
 authors = [{name = "Garyu-tt"}]

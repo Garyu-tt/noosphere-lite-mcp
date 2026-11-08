@@ -2,7 +2,7 @@
 
 **Long-term memory for AI agents that does not need to fit inside a context window.**
 
-*By Garyu-tt · v0.2.0 · Linux / Python / MCP · GNU GPLv3*
+*By Garyu-tt · v0.3.0 · Linux / Python / MCP · GNU GPLv3*
 
 [Русская документация](README.md)
 
@@ -76,12 +76,13 @@ Example for stdio-compatible MCP host configuration:
 
 Hosted ChatGPT use may require a separately supported MCP bridge; this local configuration does not itself install a hosted ChatGPT connector.
 
-## Eleven MCP tools
+## Twelve MCP tools
 
 | Tool | Purpose |
 | --- | --- |
 | memory_add | Store notes, decisions, facts and tasks |
 | memory_search | Return compact ranked matches |
+| memory_suggest_links | Read-only, unverified lexical link suggestions; never creates edges |
 | memory_read | Retrieve one complete memory |
 | memory_context | Assemble bounded task context |
 | memory_link / memory_unlink | Manage typed links |
@@ -115,3 +116,10 @@ Tests cover encryption, tamper detection, mirror recovery, graph navigation, and
 ## License / Authorship
 
 Original project code in this release: **GNU GPL-3.0-or-later**. Copyright (C) 2026 [Garyu-tt](https://github.com/Garyu-tt). See [LICENSE](LICENSE) and [AUTHORS.md](AUTHORS.md). Previously published MIT-licensed versions retain their earlier permissions and existing contributors' acknowledgments.
+
+
+## Experimental candidate link discovery (0.3.0)
+
+The `memory_suggest_links` MCP tool proposes **unverified** possible links using bounded lexical overlap across titles, tags, and text. It never changes the encrypted journal, never claims inferred relations are true, and excludes direct links and archived records. Review source evidence and test applicability before calling `memory_link`. This is **not** semantic vector retrieval, automatic skill transfer, or validated precision/recall.
+
+An exploratory benchmark from the owner's much larger private metagraph is published under `benchmarks/discovery-pilot-2026-11-08/`; **those measurements are not performance figures for Lite**. The benchmark makes the limits explicit and includes a synthetic, privacy-safe regression test.

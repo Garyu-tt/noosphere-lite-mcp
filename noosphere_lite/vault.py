@@ -340,6 +340,15 @@ class MemoryVault:
                      snippet=n["body"][:220], status=n.get("status", "current"),
                      score=s) for s,n in scored[:max(1, min(limit,50))]]
 
+    def suggest_links(self, memory_id: str, limit: int = 10) -> list[dict]:
+        """Read-only hypotheses only; never create a graph edge or assert truth."""
+        from .discovery import suggest_links
+        snap = self._snapshot()
+        try:
+            return suggest_links(snap.nodes, snap.links, memory_id, limit)
+        except (KeyError, ValueError, TypeError) as exc:
+            raise VaultError("invalid or missing memory for link suggestions") from exc
+
     def link(self, from_id: str, to_id: str, relation: str = "related") -> dict:
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", relation):
             raise VaultError("invalid relation")

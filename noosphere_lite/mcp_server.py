@@ -23,6 +23,11 @@ def run(vault: MemoryVault):
         return vault.search(query, limit)
 
     @app.tool()
+    def memory_suggest_links(memory_id: str, limit: int = 10) -> list[dict]:
+        """Suggest candidate cross-domain links without creating or verifying them."""
+        return vault.suggest_links(memory_id, limit)
+
+    @app.tool()
     def memory_read(memory_id: str) -> dict:
         """Retrieve one specific memory's complete content."""
         return vault.read(memory_id)

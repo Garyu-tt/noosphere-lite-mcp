@@ -1,0 +1,315 @@
+{
+  "schema": "noosphere.discover-pilot-public-v1",
+  "date": "2026-11-08",
+  "reviewer": "single assistant, NOT independent human-reviewed",
+  "seed": 20261108,
+  "candidate_population": 46,
+  "strata": [
+    {
+      "bucket": "high",
+      "population": 13,
+      "sampled": 8
+    },
+    {
+      "bucket": "mid",
+      "population": 14,
+      "sampled": 8
+    },
+    {
+      "bucket": "low",
+      "population": 19,
+      "sampled": 8
+    }
+  ],
+  "sample": [
+    {
+      "id": 1,
+      "bucket": "high",
+      "score": 3.4000000000000004,
+      "topic": "agents",
+      "family_a": "Connectome",
+      "family_b": "MoonSweepers",
+      "label": "noise",
+      "reason": "Fly connectome visualization doesn't implement autonomous MoonSweepers behavior."
+    },
+    {
+      "id": 4,
+      "bucket": "high",
+      "score": 5.6,
+      "topic": "connectome",
+      "family_a": "ALT",
+      "family_b": "BitWeave",
+      "label": "plausible",
+      "reason": "Sparse event updates may transfer, but ALT's trained transformer is numerically unlike ternary BitWeave."
+    },
+    {
+      "id": 5,
+      "bucket": "high",
+      "score": 5.8,
+      "topic": "connectome",
+      "family_a": "ALT",
+      "family_b": "Connectome",
+      "label": "noise",
+      "reason": "Trained expert routing is different from displaying fly anatomy; mechanism absent."
+    },
+    {
+      "id": 6,
+      "bucket": "high",
+      "score": 5.6,
+      "topic": "connectome",
+      "family_a": "ALT",
+      "family_b": "noosphere-genesis-cpu",
+      "label": "plausible",
+      "reason": "Sparse quantized graph strategy comparable, but trained MoE and synthetic neuron simulator differ."
+    },
+    {
+      "id": 7,
+      "bucket": "high",
+      "score": 5.3999999999999995,
+      "topic": "connectome",
+      "family_a": "BitWeave",
+      "family_b": "Connectome",
+      "label": "noise",
+      "reason": "Fly GPU Bézier drawing is not the weighted numerical update accelerated by BitWeave."
+    },
+    {
+      "id": 8,
+      "bucket": "high",
+      "score": 5.199999999999999,
+      "topic": "connectome",
+      "family_a": "BitWeave",
+      "family_b": "noosphere-genesis-cpu",
+      "label": "useful",
+      "reason": "BitWeave sparse event update can be compared with GENESIS Q4 neuron steps on a matched correctness benchmark."
+    },
+    {
+      "id": 38,
+      "bucket": "high",
+      "score": 3.7,
+      "topic": "knowledge",
+      "family_a": "Mikoshi",
+      "family_b": "PokemonNative",
+      "label": "noise",
+      "reason": "AI voice narration and a native Flipper port share 'knowledge' but no reusable component in cited files."
+    },
+    {
+      "id": 45,
+      "bucket": "high",
+      "score": 3.0,
+      "topic": "network",
+      "family_a": "MOHO",
+      "family_b": "Mikrix",
+      "label": "plausible",
+      "reason": "MOHO exposes Mikrix job status; a status interface transfer is possible, not compute transfer."
+    },
+    {
+      "id": 10,
+      "bucket": "mid",
+      "score": 1.9,
+      "topic": "gpu_compute",
+      "family_a": "ALT",
+      "family_b": "BitWeave",
+      "label": "plausible",
+      "reason": "ALT real layer sparsity/quality would need measurement before binary BitWeave optimizations."
+    },
+    {
+      "id": 11,
+      "bucket": "mid",
+      "score": 1.8,
+      "topic": "gpu_compute",
+      "family_a": "ALT",
+      "family_b": "Connectome",
+      "label": "noise",
+      "reason": "ALT inference GEMM and fly WebGL drawing do not expose compatible operations."
+    },
+    {
+      "id": 19,
+      "bucket": "mid",
+      "score": 1.9,
+      "topic": "gpu_compute",
+      "family_a": "BitWeave",
+      "family_b": "Mikoshi",
+      "label": "useful",
+      "reason": "Both are P106 CUDA integer kernels; dispatcher based on shapes/sparsity is testable."
+    },
+    {
+      "id": 20,
+      "bucket": "mid",
+      "score": 1.9,
+      "topic": "gpu_compute",
+      "family_a": "BitWeave",
+      "family_b": "Mikrix",
+      "label": "noise",
+      "reason": "Mikrix accepts one whitelisted shader, not arbitrary BitWeave kernels."
+    },
+    {
+      "id": 24,
+      "bucket": "mid",
+      "score": 1.8,
+      "topic": "gpu_compute",
+      "family_a": "Connectome",
+      "family_b": "Mikoshi",
+      "label": "noise",
+      "reason": "Fly Bézier renderer does not use DP4A INT8 GEMM."
+    },
+    {
+      "id": 32,
+      "bucket": "mid",
+      "score": 2.0,
+      "topic": "gpu_compute",
+      "family_a": "Mikoshi",
+      "family_b": "Mikrix",
+      "label": "plausible",
+      "reason": "A matching whitelisted CUDA microkernel might fit Mikrix, but DP4A backend is not general virtual GPU."
+    },
+    {
+      "id": 44,
+      "bucket": "mid",
+      "score": 2.6,
+      "topic": "network",
+      "family_a": "MOHO",
+      "family_b": "Mikoshi",
+      "label": "noise",
+      "reason": "Portal monitoring and distributed compute transport merely share networking vocabulary."
+    },
+    {
+      "id": 46,
+      "bucket": "mid",
+      "score": 2.6,
+      "topic": "network",
+      "family_a": "Mikoshi",
+      "family_b": "Mikrix",
+      "label": "useful",
+      "reason": "Typed bounded compute jobs in Fabric can inform the constrained Mikrix broker contract; testable."
+    },
+    {
+      "id": 16,
+      "bucket": "low",
+      "score": 1.6,
+      "topic": "gpu_compute",
+      "family_a": "ALT",
+      "family_b": "noosphere-genesis-cpu",
+      "label": "noise",
+      "reason": "ALT GPU LLM numeric processing and GENESIS CPU neuron state have incompatible kernels."
+    },
+    {
+      "id": 21,
+      "bucket": "low",
+      "score": 1.5999999999999999,
+      "topic": "gpu_compute",
+      "family_a": "BitWeave",
+      "family_b": "nexusos",
+      "label": "noise",
+      "reason": "OpenComputers text-buffer VRAM scaling is not GPU matrix throughput."
+    },
+    {
+      "id": 22,
+      "bucket": "low",
+      "score": 1.5,
+      "topic": "gpu_compute",
+      "family_a": "BitWeave",
+      "family_b": "noosphere-genesis-cpu",
+      "label": "plausible",
+      "reason": "GENESIS could use incremental sparse updates, but BitWeave's ternary CUDA kernel is not drop-in."
+    },
+    {
+      "id": 26,
+      "bucket": "low",
+      "score": 1.5,
+      "topic": "gpu_compute",
+      "family_a": "Connectome",
+      "family_b": "nexusos",
+      "label": "noise",
+      "reason": "Fly WebGL graphics and OpenComputers text buffers are unrelated APIs."
+    },
+    {
+      "id": 29,
+      "bucket": "low",
+      "score": 1.6,
+      "topic": "gpu_compute",
+      "family_a": "MOHO",
+      "family_b": "Mikrix",
+      "label": "noise",
+      "reason": "MOHO web/CPU image pipeline does not match Mikrix whitelisted Vulkan compute."
+    },
+    {
+      "id": 30,
+      "bucket": "low",
+      "score": 1.3,
+      "topic": "gpu_compute",
+      "family_a": "MOHO",
+      "family_b": "nexusos",
+      "label": "noise",
+      "reason": "MOHO image pipeline and NexusOS text VRAM are not equivalent compute workloads."
+    },
+    {
+      "id": 33,
+      "bucket": "low",
+      "score": 1.7,
+      "topic": "gpu_compute",
+      "family_a": "Mikoshi",
+      "family_b": "nexusos",
+      "label": "noise",
+      "reason": "DP4A CUDA numerical compute does not accelerate NexusOS tier text capacity."
+    },
+    {
+      "id": 37,
+      "bucket": "low",
+      "score": 1.3,
+      "topic": "gpu_compute",
+      "family_a": "nexusos",
+      "family_b": "noosphere-genesis-cpu",
+      "label": "noise",
+      "reason": "GENESIS CPU graph dynamics and NexusOS text buffer have no confirmed GPU transfer mechanism."
+    }
+  ],
+  "known_proposals": [
+    {
+      "id": "csr_neurocore",
+      "type": "proposed_test",
+      "linked_before": false,
+      "linked_after": true
+    },
+    {
+      "id": "bitweave_sparse",
+      "type": "proposed_test",
+      "linked_before": false,
+      "linked_after": true
+    },
+    {
+      "id": "gpu_broker",
+      "type": "proposed_test",
+      "linked_before": false,
+      "linked_after": true
+    },
+    {
+      "id": "semantic_cache",
+      "type": "proposed_test",
+      "linked_before": false,
+      "linked_after": true
+    },
+    {
+      "id": "brainfly_moonbots",
+      "type": "proposed_test",
+      "linked_before": false,
+      "linked_after": true
+    },
+    {
+      "id": "TRANSFER_SHADOW_WATCHDOG_TO_MIKRIX",
+      "type": "reuse_transfer",
+      "linked_before": false,
+      "linked_after": true
+    },
+    {
+      "id": "TRANSFER_ADAPTIVE_DEADLINES_TO_MIKRIX",
+      "type": "reuse_transfer",
+      "linked_before": false,
+      "linked_after": true
+    }
+  ],
+  "notes": [
+    "No private evidence files shipped; source artifacts were reviewed by one model.",
+    "R01 annotations were frozen before R02 implementation.",
+    "Known-proposal hit counts are NOT recall."
+  ]
+}
