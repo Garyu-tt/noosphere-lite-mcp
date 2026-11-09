@@ -15,11 +15,12 @@ import struct
 import tempfile
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from .knowledge_evolution import EPISTEMIC_STATES, project_snapshot, sha256_text
 
 MAGIC = b"NLV1\n"
 AAD = b"Noosphere-Lite-MCP/v1:"
@@ -39,6 +40,7 @@ class Snapshot:
     digests: list[bytes]
     digest: bytes
     seq: int
+    link_attributes: dict = field(default_factory=dict)
 
 
 def _stamp() -> str:
@@ -192,7 +194,7 @@ class MemoryVault:
             os.close(fd)
 
     @staticmethod
-    def _apply(nodes: dict, links: dict, event: dict):
+    def _apply(nodes: dict, links: dict, event: dict, link_attributes: dict | None = None):
         op = event.get("op")
         if op == "put":
             data = event["node"]
@@ -200,8 +202,16 @@ class MemoryVault:
         elif op == "link":
             key = (event["from"], event["to"], event["relation"])
             links[key] = event.get("at")
+            if link_attributes is not None:
+                qualifiers = event.get("qualifiers", {})
+                if not isinstance(qualifiers, dict):
+                    raise VaultError("invalid link qualifiers")
+                link_attributes[key] = qualifiers
         elif op == "unlink":
-            links.pop((event["from"], event["to"], event["relation"]), None)
+            key = (event["from"], event["to"], event["relation"])
+            links.pop(key, None)
+            if link_attributes is not None:
+                link_attributes.pop(key, None)
         elif op == "archive":
             if event["id"] in nodes:
                 nodes[event["id"]] = {**nodes[event["id"]], "archived": True,
@@ -231,7 +241,7 @@ class MemoryVault:
     def _decode(self, raw: bytes, key: bytes) -> Snapshot:
         if not raw.startswith(MAGIC):
             raise VaultError("unsupported or invalid journal header")
-        nodes, links, digests = {}, {}, []
+        nodes, links, digests, link_attributes = {}, {}, [], {}
         digest = bytes(32)
         at = len(MAGIC)
         seq = 0
@@ -251,14 +261,14 @@ class MemoryVault:
                 event = json.loads(payload)
                 if not isinstance(event, dict):
                     raise ValueError("event must be a dictionary")
-                self._apply(nodes, links, event)
+                self._apply(nodes, links, event, link_attributes)
             except Exception as e:
                 raise VaultError(f"journal integrity/format failure at event {seq+1}") from e
             digest = hashlib.sha256(digest + frame).digest()
             digests.append(digest)
             seq += 1
             at += len(frame)
-        return Snapshot(nodes, links, digests, digest, seq)
+        return Snapshot(nodes, links, digests, digest, seq, link_attributes)
 
     def _reconcile(self, key: bytes) -> Snapshot:
         readings = []
@@ -322,7 +332,15 @@ class MemoryVault:
     def add(self, title: str, body: str, tags: list[str] | None = None,
             kind: str = "note", source: str = "", *,
             valid_from: str | None = None, valid_to: str | None = None,
-            observed_at: str | None = None) -> dict:
+            observed_at: str | None = None,
+            epistemic_status: str = "unreviewed",
+            intent: str = "", evidence_ref: str = "") -> dict:
+        if epistemic_status not in EPISTEMIC_STATES:
+            raise VaultError("unknown epistemic status")
+        if not isinstance(intent, str) or len(intent) > 500:
+            raise VaultError("invalid intent")
+        if not isinstance(evidence_ref, str) or len(evidence_ref) > 1000:
+            raise VaultError("invalid evidence reference")
         if not 1 <= len(title.strip()) <= 256 or len(body) > 48_000:
             raise VaultError("invalid title/body size")
         tags = tags or []
@@ -335,7 +353,9 @@ class MemoryVault:
                     tags=tags, kind=kind[:32], source=source[:500],
                     created=when, updated=when, recorded_at=when,
                     observed_at=observed, valid_from=start, valid_to=end,
-                    archived=False, status="current")
+                    archived=False, status="current",
+                    epistemic_status=epistemic_status,
+                    intent=intent, evidence_ref=evidence_ref)
         self._append(dict(op="put", node=node))
         return dict(id=node["id"], title=node["title"], created=when)
 
@@ -344,7 +364,12 @@ class MemoryVault:
         node = state.nodes.get(memory_id)
         if not node or node.get("archived"):
             raise VaultError("memory not found")
-        return dict(node)
+        result = dict(node)
+        if "machine_enrichment" in result:
+            result["enrichment_stale"] = (
+                result.get("enrichment_basis") != sha256_text(result["body"])
+            )
+        return result
 
     def search(self, query: str, limit: int = 10,
                as_of: str | None = None) -> list[dict]:
@@ -395,12 +420,27 @@ class MemoryVault:
         except (KeyError, ValueError, TypeError) as exc:
             raise VaultError("invalid or missing memory for link suggestions") from exc
 
-    def link(self, from_id: str, to_id: str, relation: str = "related") -> dict:
+    def link(self, from_id: str, to_id: str, relation: str = "related",
+             *, epistemic_status: str = "unreviewed",
+             evidence_ref: str = "", intent: str = "",
+             origin: str = "") -> dict:
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", relation):
             raise VaultError("invalid relation")
-        self._append(dict(op="link", at=_stamp(),
+        if epistemic_status not in EPISTEMIC_STATES:
+            raise VaultError("unknown epistemic status")
+        for label, value, maximum in (
+            ("evidence reference", evidence_ref, 1000),
+            ("intent", intent, 500), ("origin", origin, 500)
+        ):
+            if not isinstance(value, str) or len(value) > maximum:
+                raise VaultError(f"invalid link {label}")
+        qualifiers = {"epistemic_status": epistemic_status,
+                      "evidence_ref": evidence_ref,
+                      "intent": intent, "origin": origin}
+        self._append(dict(op="link", at=_stamp(), qualifiers=qualifiers,
                           **{"from":from_id, "to":to_id, "relation":relation}))
-        return {"linked": True, "from": from_id, "to": to_id, "relation": relation}
+        return {"linked": True, "from": from_id, "to": to_id,
+                "relation": relation, "qualifiers": qualifiers}
 
     def unlink(self, from_id: str, to_id: str, relation: str = "related") -> dict:
         self._append(dict(op="unlink", at=_stamp(),
@@ -422,7 +462,8 @@ class MemoryVault:
                 if state.nodes.get(neighbor, {}).get("archived"):
                     continue
                 edges.append({"from": a, "to": b, "relation": rel,
-                              "recorded_at": state.links[(a, b, rel)]})
+                              "recorded_at": state.links[(a, b, rel)],
+                              "qualifiers": state.link_attributes.get((a, b, rel), {})})
                 if neighbor not in discovered and len(discovered) < max(1, min(limit, 200)):
                     discovered.add(neighbor)
                     queue.append((neighbor, distance+1))
@@ -520,6 +561,60 @@ class MemoryVault:
             raise VaultError("rejection tombstones cannot be archived")
         self._append(dict(op="archive", id=memory_id, at=_stamp()))
         return {"archived": True, "warning": "archived records remain in encrypted event history"}
+
+    def enrichment_gate(self, memory_id: str) -> dict:
+        """Independent author-vs-machine hashes; no automatic model invocation."""
+        node = self.read(memory_id)
+        author_hash = sha256_text(node["body"])
+        return {
+            "memory_id": memory_id,
+            "author_hash": author_hash,
+            "machine_hash": node.get("machine_hash"),
+            "last_enriched_author_hash": node.get("enrichment_basis"),
+            "needs_enrichment": node.get("enrichment_basis") != author_hash,
+        }
+
+    def enrich(self, memory_id: str, content: str,
+               expected_author_hash: str) -> dict:
+        """Append a machine-owned enrichment only after optimistic hash check.
+
+        Enrichments never rewrite human-owned body or cascade stale derived
+        claims. Subsequent author revisions mark the prior enrichment stale
+        in read() until a fresh enrichment is explicitly admitted.
+        """
+        if not isinstance(content, str) or not 1 <= len(content) <= 12_000:
+            raise VaultError("invalid enrichment length")
+        if not isinstance(expected_author_hash, str) or not re.fullmatch(
+                r"[a-f0-9]{64}", expected_author_hash):
+            raise VaultError("invalid expected author hash")
+        def make_event(state: Snapshot) -> dict:
+            node = state.nodes.get(memory_id)
+            if not node or node.get("archived"):
+                raise VaultError("memory not found")
+            actual = sha256_text(node["body"])
+            if actual != expected_author_hash:
+                raise VaultError("author content changed; enrichment rejected")
+            if node.get("enrichment_basis") == actual:
+                raise VaultError("author content unchanged; re-enrichment rejected")
+            at = _stamp()
+            updated = {
+                **node,
+                "machine_enrichment": content,
+                "enrichment_basis": actual,
+                "machine_hash": sha256_text(content),
+                "enriched_at": at,
+            }
+            # Reuse legacy revise event shape: old clients can replay the journal.
+            # No author-body mutation, therefore no downstream stale cascade.
+            return dict(op="revise", node=updated, stale_ids=[], at=at)
+        self._append(make_event)
+        return {"enriched": True, "memory_id": memory_id,
+                "author_hash": expected_author_hash,
+                "machine_hash": sha256_text(content)}
+
+    def graph_projection(self, limit: int = 200) -> dict:
+        """Derived read-only graph snapshot, kept out of plaintext disk files."""
+        return project_snapshot(self._snapshot(), limit)
 
     def status(self) -> dict:
         snap = self._snapshot()
