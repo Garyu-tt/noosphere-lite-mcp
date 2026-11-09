@@ -58,6 +58,16 @@ class TraceTests(unittest.TestCase):
         self.assertFalse(x["truth_guaranteed"])
         self.assertFalse(x["truncated"])
 
+    def test_preserves_indexed_provenance(self):
+        x = inspect_code(self.path, "fn:a")
+        self.assertEqual(x["root"]["indexed_source_status"], "parsed_ast_not_runtime_verified")
+        self.assertEqual(x["root"]["source_status"], "static_ast_not_runtime_verified")
+
+    def test_bool_bounds_rejected(self):
+        for kw in ({"depth": True}, {"limit": True}):
+            with self.assertRaises(ValueError):
+                inspect_code(self.path, "fn:a", **kw)
+
     def test_outgoing_only(self):
         x = inspect_code(self.path, "fn:a", depth=2, include_incoming=False)
         self.assertEqual({v["id"] for v in x["functions"]}, {"fn:a", "fn:b"})
