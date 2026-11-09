@@ -88,6 +88,28 @@ class FederationTests(unittest.TestCase):
             import_live(self.db,max_items=1,max_versions=1)
         with self.assertRaisesRegex(ValueError,"invalid attached schema"):
             import_live(self.db,source_schema="live;DROP TABLE nodes")
+    def test_import_live_mid_write_failure_rolls_back_and_preserves_caller(self):
+        self.sample_live()
+        self.db.execute("CREATE TRIGGER reject_federated_item BEFORE INSERT ON nodes "
+                        "WHEN NEW.kind='observed_external_item' BEGIN SELECT RAISE(ABORT,'synthetic failure'); END")
+        self.db.execute("INSERT INTO nodes VALUES('caller:marker','test','marker','marker','marker','marker')")
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(sqlite3.IntegrityError, 'synthetic failure'):
+            import_live(self.db)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes").fetchone()[0], before)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM edges").fetchone()[0], 0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes WHERE id='caller:marker'").fetchone()[0], 1)
+
+    def test_import_semantic_mid_write_failure_rolls_back(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:sample','proj-a','a.py','f','python',1,self.sha1,'parsed_ast'))
+        self.db.execute("CREATE TRIGGER reject_semantic BEFORE INSERT ON nodes "
+                        "WHEN NEW.kind='static_function' BEGIN SELECT RAISE(ABORT,'synthetic failure'); END")
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(sqlite3.IntegrityError, 'synthetic failure'):
+            import_semantic(self.db)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes").fetchone()[0], before)
+
     def test_late_version_overflow_is_atomic(self):
         self.sample_live()
         before = (self.db.execute("SELECT count(*) FROM nodes").fetchone()[0],
