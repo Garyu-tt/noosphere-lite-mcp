@@ -72,6 +72,14 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
         raise ValueError("invalid attached schema")
     if not 0 < max_items <= 100000 or not 0 < max_versions <= 500000:
         raise ValueError("invalid bounds")
+    # Preflight all bounded tables before mutating the destination graph.
+    # Otherwise a late versions overflow leaves partially imported items.
+    for table, limit, label in (("items", max_items, "item"),
+                                ("versions", max_versions, "version")):
+        count = db.execute(
+            f"SELECT count(*) FROM {source_schema}.{table}").fetchone()[0]
+        if count > limit:
+            raise ValueError(f"federated {label} bound exceeded; refuse partial graph")
     has_caps = {row[0] for row in db.execute(
         "SELECT native_id FROM nodes WHERE layer='code' AND kind='programming_capability'")}
     counts={"sources":0,"items":0,"versions":0,"topic_candidates":0}
@@ -145,6 +153,12 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
         raise ValueError("invalid attached schema")
     if not 0 < max_functions <= 100000 or not 0 < max_calls <= 500000:
         raise ValueError("invalid bounds")
+    # Both bounds must pass before inserting any semantic nodes or edges.
+    call_count = db.execute(
+        f"SELECT count(*) FROM {source_schema}.calls WHERE callee IS NOT NULL"
+    ).fetchone()[0]
+    if call_count > max_calls:
+        raise ValueError("semantic call bound exceeded; refuse partial graph")
     count=db.execute(f"SELECT count(*) FROM {source_schema}.funcs").fetchone()[0]
     if count>max_functions:
         raise ValueError("semantic function bound exceeded; refuse partial graph")
