@@ -37,14 +37,10 @@ def annotate_trace(trace: dict, trusted_projects: dict[str, str], *, max_bytes: 
         enriched.append(item)
     result['functions'] = enriched
     if isinstance(trace.get('root'), dict):
-        root_ref = trace['root'].get('ref')
-        matching = next((x for x in enriched if root_ref is not None and x.get('ref') == root_ref), None)
-        # A root omitted from the bounded function list still needs evidence.
-        # Never silently return an unannotated root as if it were checked.
-        if matching is None:
-            matching = annotate_trace({'functions': [trace['root']]}, trusted_projects,
-                                      max_bytes=max_bytes)['functions'][0]
-        result['root'] = matching
+        # Independently verify root: refs are not globally unique across projects,
+        # and a bounded functions list may contain a different record with the same ref.
+        result['root'] = annotate_trace({'functions': [trace['root']]}, trusted_projects,
+                                        max_bytes=max_bytes)['functions'][0]
     result['runtime_verified'] = False
     result['source_freshness_policy'] = 'trusted_project_roots_only; static evidence; fail closed'
     return result
