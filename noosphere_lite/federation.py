@@ -191,6 +191,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
             FROM {source_schema}.funcs ORDER BY id""").fetchall()
     counts={"functions":0,"project_edges":0,"call_candidates":0,
             "body_hubs":0,"body_candidates":0}
+    # Reject stale call-site AST evidence from a different source revision.
+    caller_digests = {str(fid): str(digest) for fid, _, _, _, _, _, digest, _ in rows
+                      if str(fid).startswith("fn:") and SHA256.fullmatch(str(digest))}
     for fid,project,path,qualname,lang,line,digest,status in rows:
         fid=str(fid)
         if not fid.startswith("fn:") or not SHA256.fullmatch(str(digest)):
@@ -211,6 +214,8 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
         f"""SELECT caller,callee,resolution,source_sha256,line
             FROM {source_schema}.calls WHERE callee IS NOT NULL
             ORDER BY caller,line"""):
+        if not SHA256.fullmatch(str(sha)) or caller_digests.get(str(caller)) != str(sha):
+            continue  # stale or unprovable call-site evidence
         a,b="fed:semantic:"+str(caller),"fed:semantic:"+str(callee)
         if a==b and resolution=="attribute_name_only": continue
         if db.execute("SELECT 1 FROM nodes WHERE id=?",(a,)).fetchone() is None: continue
