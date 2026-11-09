@@ -82,6 +82,26 @@ class FederationTests(unittest.TestCase):
         self.assertEqual(stats["body_hubs"],1)
         self.assertEqual(stats["body_candidates"],2)
         self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE dst='fed:body:"+self.sha2+"'").fetchone()[0],2)
+    def test_stale_twin_project_does_not_create_false_cross_project_hub(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:a','proj-a','a.py','a','python',1,self.sha1,'parsed_ast'))
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:b','proj-b','b.py','b','python',1,self.sha1,'parsed_ast'))
+        self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",(self.sha2,'fn:a','proj-a'))
+        # A stale row claims fn:a belongs to proj-b, although funcs disagrees.
+        self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",(self.sha2,'fn:a','proj-b'))
+        stats=import_semantic(self.db)
+        self.assertEqual(stats['body_hubs'],0)
+        self.assertEqual(stats['body_candidates'],0)
+
+    def test_valid_twin_projects_still_link(self):
+        for fid,project in [('fn:a','proj-a'),('fn:b','proj-b')]:
+            self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                            (fid,project,'x.py',fid,'python',1,self.sha1,'parsed_ast'))
+            self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",(self.sha2,fid,project))
+        stats=import_semantic(self.db)
+        self.assertEqual((stats['body_hubs'],stats['body_candidates']),(1,2))
+
     def test_twin_bound_rejects_before_writing(self):
         self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
                         ('fn:a','proj-a','a.py','a','python',1,self.sha1,'parsed_ast'))
