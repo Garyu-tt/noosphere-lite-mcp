@@ -82,12 +82,94 @@ class FederationTests(unittest.TestCase):
         self.assertEqual(stats["body_hubs"],1)
         self.assertEqual(stats["body_candidates"],2)
         self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE dst='fed:body:"+self.sha2+"'").fetchone()[0],2)
+    def test_stale_twin_project_does_not_create_false_cross_project_hub(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:a','proj-a','a.py','a','python',1,self.sha1,'parsed_ast'))
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:b','proj-b','b.py','b','python',1,self.sha1,'parsed_ast'))
+        self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",(self.sha2,'fn:a','proj-a'))
+        # A stale row claims fn:a belongs to proj-b, although funcs disagrees.
+        self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",(self.sha2,'fn:a','proj-b'))
+        stats=import_semantic(self.db)
+        self.assertEqual(stats['body_hubs'],0)
+        self.assertEqual(stats['body_candidates'],0)
+
+    def test_valid_twin_projects_still_link(self):
+        for fid,project in [('fn:a','proj-a'),('fn:b','proj-b')]:
+            self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                            (fid,project,'x.py',fid,'python',1,self.sha1,'parsed_ast'))
+            self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",(self.sha2,fid,project))
+        stats=import_semantic(self.db)
+        self.assertEqual((stats['body_hubs'],stats['body_candidates']),(1,2))
+
+    def test_twin_bound_rejects_before_writing(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:a','proj-a','a.py','a','python',1,self.sha1,'parsed_ast'))
+        for project in ('proj-a','proj-b'):
+            self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",
+                            (self.sha2,'fn:a',project))
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(ValueError, "twin bound exceeded"):
+            import_semantic(self.db, max_twins=1)
+        self.assertEqual(before, self.db.execute("SELECT count(*) FROM nodes").fetchone()[0])
+
+    def test_boolean_twin_bound_rejected(self):
+        with self.assertRaisesRegex(ValueError, "invalid bounds"):
+            import_semantic(self.db, max_twins=True)
+
+    def test_stale_call_site_digest_is_not_attached_to_new_source(self):
+        for fid in ('fn:a', 'fn:b'):
+            self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                            (fid,'proj-a','a.py',fid,'python',1,self.sha1,'parsed_ast'))
+        self.db.execute("INSERT INTO semantic.calls VALUES(?,?,?,?,?)",
+                        ('fn:a','fn:b','same_module_name_candidate',self.sha2,2))
+        self.db.execute("INSERT INTO semantic.calls VALUES(?,?,?,?,?)",
+                        ('fn:a','fn:b','same_module_name_candidate','invalid',3))
+        stats = import_semantic(self.db)
+        self.assertEqual(stats['call_candidates'], 0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE relation='static_call_candidate'").fetchone()[0], 0)
+
+    def test_source_bound_prevents_partial_graph(self):
+        self.sample_live()
+        self.db.execute("INSERT INTO live.sources VALUES('another','rss','Another','https://example.org','2026-11-09')")
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(ValueError, "source bound exceeded"):
+            import_live(self.db, max_sources=1)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes").fetchone()[0], before)
+
+    def test_boolean_source_bound_rejected(self):
+        self.sample_live()
+        with self.assertRaisesRegex(ValueError, "invalid bounds"):
+            import_live(self.db, max_sources=True)
+
     def test_bounds_fail_closed(self):
         self.sample_live()
         with self.assertRaisesRegex(ValueError,"bound exceeded"):
             import_live(self.db,max_items=1,max_versions=1)
         with self.assertRaisesRegex(ValueError,"invalid attached schema"):
             import_live(self.db,source_schema="live;DROP TABLE nodes")
+    def test_import_live_mid_write_failure_rolls_back_and_preserves_caller(self):
+        self.sample_live()
+        self.db.execute("CREATE TRIGGER reject_federated_item BEFORE INSERT ON nodes "
+                        "WHEN NEW.kind='observed_external_item' BEGIN SELECT RAISE(ABORT,'synthetic failure'); END")
+        self.db.execute("INSERT INTO nodes VALUES('caller:marker','test','marker','marker','marker','marker')")
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(sqlite3.IntegrityError, 'synthetic failure'):
+            import_live(self.db)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes").fetchone()[0], before)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM edges").fetchone()[0], 0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes WHERE id='caller:marker'").fetchone()[0], 1)
+
+    def test_import_semantic_mid_write_failure_rolls_back(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:sample','proj-a','a.py','f','python',1,self.sha1,'parsed_ast'))
+        self.db.execute("CREATE TRIGGER reject_semantic BEFORE INSERT ON nodes "
+                        "WHEN NEW.kind='static_function' BEGIN SELECT RAISE(ABORT,'synthetic failure'); END")
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(sqlite3.IntegrityError, 'synthetic failure'):
+            import_semantic(self.db)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes").fetchone()[0], before)
+
     def test_late_version_overflow_is_atomic(self):
         self.sample_live()
         before = (self.db.execute("SELECT count(*) FROM nodes").fetchone()[0],

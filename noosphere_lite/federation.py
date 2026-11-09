@@ -8,6 +8,8 @@ indexed code. The caller controls source permissions, DB attaches and publicatio
 from __future__ import annotations
 
 import hashlib
+import functools
+import itertools
 import re
 import sqlite3
 from typing import Any
@@ -61,8 +63,28 @@ def _aliases(title: str) -> tuple[str, ...]:
             hits.append(capability)
     return tuple(hits)
 
+_savepoint_ids = itertools.count()
+
+def atomic_graph_import(func):
+    """Rollback only this import's writes, preserving the caller's transaction."""
+    @functools.wraps(func)
+    def wrapped(db, *args, **kwargs):
+        name = f"noosphere_import_{next(_savepoint_ids)}"
+        db.execute(f"SAVEPOINT {name}")
+        try:
+            result = func(db, *args, **kwargs)
+        except BaseException:
+            db.execute(f"ROLLBACK TO SAVEPOINT {name}")
+            db.execute(f"RELEASE SAVEPOINT {name}")
+            raise
+        db.execute(f"RELEASE SAVEPOINT {name}")
+        return result
+    return wrapped
+
+@atomic_graph_import
 def import_live(db: sqlite3.Connection, source_schema: str = "live",
-                max_items: int = 30000, max_versions: int = 80000) -> dict[str,int]:
+                max_items: int = 30000, max_versions: int = 80000,
+                max_sources: int = 10000) -> dict[str,int]:
     """Import external observations without claiming correctness.
 
     source_schema must name an already attached read-only SQLite database.
@@ -70,11 +92,14 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*",source_schema):
         raise ValueError("invalid attached schema")
-    if not 0 < max_items <= 100000 or not 0 < max_versions <= 500000:
+    if (type(max_items) is not int or type(max_versions) is not int or
+            type(max_sources) is not int or not 0 < max_sources <= 100000 or
+            not 0 < max_items <= 100000 or not 0 < max_versions <= 500000):
         raise ValueError("invalid bounds")
     # Preflight all bounded tables before mutating the destination graph.
     # Otherwise a late versions overflow leaves partially imported items.
-    for table, limit, label in (("items", max_items, "item"),
+    for table, limit, label in (("sources", max_sources, "source"),
+                                ("items", max_items, "item"),
                                 ("versions", max_versions, "version")):
         count = db.execute(
             f"SELECT count(*) FROM {source_schema}.{table}").fetchone()[0]
@@ -142,8 +167,10 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
         counts["versions"]+=1
     return counts
 
+@atomic_graph_import
 def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
-                    max_functions: int = 50000, max_calls: int = 150000
+                    max_functions: int = 50000, max_calls: int = 150000,
+                    max_twins: int = 150000
                     ) -> dict[str,int]:
     """Attach AST function and cautiously resolved call candidates.
 
@@ -151,7 +178,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*",source_schema):
         raise ValueError("invalid attached schema")
-    if not 0 < max_functions <= 100000 or not 0 < max_calls <= 500000:
+    if (type(max_functions) is not int or type(max_calls) is not int or
+            type(max_twins) is not int or not 0 < max_twins <= 500000 or
+            not 0 < max_functions <= 100000 or not 0 < max_calls <= 500000):
         raise ValueError("invalid bounds")
     # Both bounds must pass before inserting any semantic nodes or edges.
     call_count = db.execute(
@@ -159,6 +188,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
     ).fetchone()[0]
     if call_count > max_calls:
         raise ValueError("semantic call bound exceeded; refuse partial graph")
+    twin_count = db.execute(f"SELECT count(*) FROM {source_schema}.twins").fetchone()[0]
+    if twin_count > max_twins:
+        raise ValueError("semantic twin bound exceeded; refuse partial graph")
     count=db.execute(f"SELECT count(*) FROM {source_schema}.funcs").fetchone()[0]
     if count>max_functions:
         raise ValueError("semantic function bound exceeded; refuse partial graph")
@@ -167,6 +199,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
             FROM {source_schema}.funcs ORDER BY id""").fetchall()
     counts={"functions":0,"project_edges":0,"call_candidates":0,
             "body_hubs":0,"body_candidates":0}
+    # Reject stale call-site AST evidence from a different source revision.
+    caller_digests = {str(fid): str(digest) for fid, _, _, _, _, _, digest, _ in rows
+                      if str(fid).startswith("fn:") and SHA256.fullmatch(str(digest))}
     for fid,project,path,qualname,lang,line,digest,status in rows:
         fid=str(fid)
         if not fid.startswith("fn:") or not SHA256.fullmatch(str(digest)):
@@ -187,6 +222,8 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
         f"""SELECT caller,callee,resolution,source_sha256,line
             FROM {source_schema}.calls WHERE callee IS NOT NULL
             ORDER BY caller,line"""):
+        if not SHA256.fullmatch(str(sha)) or caller_digests.get(str(caller)) != str(sha):
+            continue  # stale or unprovable call-site evidence
         a,b="fed:semantic:"+str(caller),"fed:semantic:"+str(callee)
         if a==b and resolution=="attribute_name_only": continue
         if db.execute("SELECT 1 FROM nodes WHERE id=?",(a,)).fetchone() is None: continue
@@ -197,9 +234,10 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
         counts["call_candidates"]+=1
     # Fingerprint hubs scale linearly with function count (no clique expansion).
     for body_hash,nprojects in db.execute(
-        f"""SELECT body_hash,count(DISTINCT project)
-            FROM {source_schema}.twins
-            GROUP BY body_hash HAVING count(DISTINCT project)>1 ORDER BY body_hash"""):
+        f"""SELECT t.body_hash,count(DISTINCT t.project)
+            FROM {source_schema}.twins t
+            JOIN {source_schema}.funcs f ON f.id=t.func_id AND f.project=t.project
+            GROUP BY t.body_hash HAVING count(DISTINCT t.project)>1 ORDER BY t.body_hash"""):
         if not SHA256.fullmatch(str(body_hash)):continue
         hub="fed:body:"+str(body_hash)
         _node(db,hub,"semantic",str(body_hash),"ast_body_fingerprint",
@@ -207,7 +245,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
               "static_ast_fingerprint:"+str(body_hash))
         counts["body_hubs"]+=1
         for (fid,) in db.execute(
-            f"SELECT func_id FROM {source_schema}.twins WHERE body_hash=?",
+            f"""SELECT t.func_id FROM {source_schema}.twins t
+                JOIN {source_schema}.funcs f ON f.id=t.func_id AND f.project=t.project
+                WHERE t.body_hash=?""",
             (body_hash,)).fetchall():
             ident="fed:semantic:"+str(fid)
             if db.execute("SELECT 1 FROM nodes WHERE id=?",(ident,)).fetchone() is None:
