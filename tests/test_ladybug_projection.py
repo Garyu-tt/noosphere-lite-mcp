@@ -132,7 +132,7 @@ class LadybugProjectionTests(unittest.TestCase):
         register_mcp_tools(app, self.vault)
         self.assertEqual(set(app.registered), {
             "memory_ladybug_sync", "memory_ladybug_neighbors",
-            "memory_ladybug_status",
+            "memory_ladybug_status", "memory_ladybug_paths",
         })
         self.assertFalse(app.registered["memory_ladybug_status"]()["initialized"])
         self.assertTrue(app.registered["memory_ladybug_sync"]()["refreshed"])
@@ -149,16 +149,12 @@ class LadybugProjectionTests(unittest.TestCase):
         self.sidecar.sync()
         good_status = self.sidecar.status()
         real_vault = self.sidecar.vault
-        class Truncated:
-            def graph_projection(self, **kwargs):
-                record = real_vault.graph_projection(**kwargs)
-                return {**record, "truncated": True}
-        self.sidecar.vault = Truncated()
-        with self.assertRaisesRegex(ProjectionError, "partial sync"):
+        self.sidecar.limit = 1
+        with self.assertRaisesRegex(ProjectionError, "max_nodes"):
             self.sidecar.sync()
         self.assertEqual(good_status, self.sidecar.status())
         with self.assertRaises(ProjectionError):
-            InMemoryLadybugProjection(real_vault, limit=1001)
+            InMemoryLadybugProjection(real_vault, limit=50001)
 
 
 if __name__ == "__main__":

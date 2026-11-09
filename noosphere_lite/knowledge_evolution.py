@@ -80,6 +80,35 @@ def merge_markdown_enrichment(
     return human + OWNERSHIP_SENTINEL + ENRICHMENT_HEADING + machine_text.rstrip("\n") + "\n"
 
 
+def projection_node(n: dict) -> dict:
+    """Shared JSON-stable mapping for bounded MCP and paged Ladybug projections."""
+    return {
+        "id": n["id"],
+        "title": n["title"],
+        "kind": n["kind"],
+        "status": n.get("status", "current"),
+        "source": n.get("source", ""),
+        "recorded_at": n.get("recorded_at", n.get("created")),
+        "epistemic_status": n.get("epistemic_status", "unreviewed"),
+        "intent": n.get("intent", ""),
+        "evidence_ref": n.get("evidence_ref", ""),
+        "evidence_verified": False,
+    }
+
+
+def projection_edge(snapshot, key: tuple[str, str, str]) -> dict:
+    """Preserve directed relation, edge qualifiers, and absent proof of truth."""
+    src, dst, rel = key
+    return {
+        "from": src,
+        "to": dst,
+        "relation": rel,
+        "recorded_at": snapshot.links[key],
+        "qualifiers": getattr(snapshot, "link_attributes", {}).get(key, {}),
+        "evidence_verified": False,
+    }
+
+
 def project_snapshot(snapshot, limit: int = 200) -> dict:
     """Bounded read-only, plaintext-in-memory graph projection.
 
@@ -94,32 +123,11 @@ def project_snapshot(snapshot, limit: int = 200) -> dict:
     )
     selected = active[:limit]
     ids = {node["id"] for node in selected}
-    nodes = [
-        {
-            "id": n["id"],
-            "title": n["title"],
-            "kind": n["kind"],
-            "status": n.get("status", "current"),
-            "source": n.get("source", ""),
-            "recorded_at": n.get("recorded_at", n.get("created")),
-            "epistemic_status": n.get("epistemic_status", "unreviewed"),
-            "intent": n.get("intent", ""),
-            "evidence_ref": n.get("evidence_ref", ""),
-            "evidence_verified": False,  # Separate EvidenceGate is authoritative.
-        }
-        for n in selected
-    ]
+    nodes = [projection_node(n) for n in selected]
     edges = [
-        {
-            "from": src,
-            "to": dst,
-            "relation": rel,
-            "recorded_at": snapshot.links[(src, dst, rel)],
-            "qualifiers": getattr(snapshot, "link_attributes", {}).get((src, dst, rel), {}),
-            "evidence_verified": False,
-        }
-        for src, dst, rel in sorted(snapshot.links)
-        if src in ids and dst in ids
+        projection_edge(snapshot, key)
+        for key in sorted(snapshot.links)
+        if key[0] in ids and key[1] in ids
     ]
     payload = {"nodes": nodes, "links": edges}
     projection_hash = sha256_text(json.dumps(

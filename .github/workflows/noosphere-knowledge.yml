@@ -7,9 +7,11 @@ on:
       - "noosphere_lite/vault.py"
       - "noosphere_lite/knowledge_evolution.py"
       - "noosphere_lite/ladybug_projection.py"
+      - "noosphere_lite/graph_plan.py"
       - "noosphere_lite/mcp_server.py"
       - "tests/test_knowledge_evolution.py"
       - "tests/test_ladybug_projection.py"
+      - "tests/test_graph_scale_r03.py"
       - "pyproject.toml"
       - ".github/workflows/noosphere-knowledge.yml"
   pull_request:
@@ -17,9 +19,11 @@ on:
       - "noosphere_lite/vault.py"
       - "noosphere_lite/knowledge_evolution.py"
       - "noosphere_lite/ladybug_projection.py"
+      - "noosphere_lite/graph_plan.py"
       - "noosphere_lite/mcp_server.py"
       - "tests/test_knowledge_evolution.py"
       - "tests/test_ladybug_projection.py"
+      - "tests/test_graph_scale_r03.py"
       - "pyproject.toml"
       - ".github/workflows/noosphere-knowledge.yml"
 

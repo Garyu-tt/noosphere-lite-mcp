@@ -1,3 +1,7 @@
+> **R03 update:** The 1,000-node prototype cap described below has been
+> superseded for the optional Ladybug sidecar by [Graph Scale R03](GRAPH_SCALE_R03.md).
+> The original MCP `memory_graph_projection` cap is unchanged.
+>
 # LadybugDB ephemeral graph sidecar R02
 
 **Status:** tested opt-in development integration, **not deployed** into the running

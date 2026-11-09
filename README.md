@@ -240,3 +240,14 @@ and opt in using `NSL_LADYBUG_EPHEMERAL=1` when starting the MCP server.
 The optional MCP methods are `memory_ladybug_sync`,
 `memory_ladybug_status`, and `memory_ladybug_neighbors`.
 Read [R02 design, threat model, safety limits and tests](docs/LADYBUG_SIDECAR_R02.md).
+
+
+### Graph Scale R03 (batched LadybugDB)
+
+The optional graph sidecar can now build a snapshot-consistent, hashed,
+atomic batched projection from up to 50,000 active nodes and 500,000
+active edges (limits, **not** validated production throughput). New
+`memory_ladybug_paths` supports up to four directed relationship hops
+with explicit result budgets and relation filters. The journal remains the
+sole authoritative store; no plaintext graph database is persisted.
+See [Graph Scale R03](docs/GRAPH_SCALE_R03.md) for test receipts and limits.
