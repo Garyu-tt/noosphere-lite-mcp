@@ -219,3 +219,11 @@ Run: python -m noosphere_lite.peer_cli sync-skills --db /your/private/peers.sqli
 
 To enable two additional MCP read-only tools, set NSL_PEER_DB to the path
 of an initialized peer database. See docs/PEER_NOOSPHERE_INTEROP_R01.md.
+
+
+## Knowledge Evolution R01 (opt-in)
+
+Typed relationship provenance, two-hash machine enrichment, epistemic qualifiers,
+and an in-memory rebuildable graph projection extend the encrypted journal
+without forcing LadybugDB or a data migration.
+See [architecture, limitations and test receipt](docs/KNOWLEDGE_EVOLUTION_R01.md).
