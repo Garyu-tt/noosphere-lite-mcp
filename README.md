@@ -227,3 +227,16 @@ Typed relationship provenance, two-hash machine enrichment, epistemic qualifiers
 and an in-memory rebuildable graph projection extend the encrypted journal
 without forcing LadybugDB or a data migration.
 See [architecture, limitations and test receipt](docs/KNOWLEDGE_EVOLUTION_R01.md).
+
+
+### LadybugDB ephemeral graph sidecar R02 (optional)
+
+Run a **process-local, in-memory** LadybugDB view of the encrypted memory
+journal, with typed relationship traversals and checkpointed atomic refresh.
+No graph body data is exported, no persistent plaintext index is created,
+and the main vault is never replaced. Install `pip install -e '.[ladybug]'`
+and opt in using `NSL_LADYBUG_EPHEMERAL=1` when starting the MCP server.
+
+The optional MCP methods are `memory_ladybug_sync`,
+`memory_ladybug_status`, and `memory_ladybug_neighbors`.
+Read [R02 design, threat model, safety limits and tests](docs/LADYBUG_SIDECAR_R02.md).

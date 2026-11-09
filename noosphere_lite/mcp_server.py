@@ -198,9 +198,15 @@ def run(vault: MemoryVault):
         return briefings.by_source(project, source_ref,
                                    limit=limit, max_chars=max_chars)
 
+    # Ladybug graph stays strictly in-memory and is rebuilt from the vault.
+    # No extra plaintext files or live dual-write timing assumptions.
+    import os
+    if os.environ.get("NSL_LADYBUG_EPHEMERAL") == "1":
+        from .ladybug_projection import register_mcp_tools
+        register_mcp_tools(app, vault)
+
     # Explicit opt-in: peer registry is private local cached metadata, never
     # a default network crawler or a trusted source of executable instructions.
-    import os
     peer_db = os.environ.get("NSL_PEER_DB")
     if peer_db:
         import sqlite3
