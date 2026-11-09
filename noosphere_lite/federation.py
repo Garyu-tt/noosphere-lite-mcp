@@ -83,7 +83,8 @@ def atomic_graph_import(func):
 
 @atomic_graph_import
 def import_live(db: sqlite3.Connection, source_schema: str = "live",
-                max_items: int = 30000, max_versions: int = 80000) -> dict[str,int]:
+                max_items: int = 30000, max_versions: int = 80000,
+                max_sources: int = 10000) -> dict[str,int]:
     """Import external observations without claiming correctness.
 
     source_schema must name an already attached read-only SQLite database.
@@ -92,11 +93,13 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
     if not re.fullmatch(r"[a-z][a-z0-9_]*",source_schema):
         raise ValueError("invalid attached schema")
     if (type(max_items) is not int or type(max_versions) is not int or
+            type(max_sources) is not int or not 0 < max_sources <= 100000 or
             not 0 < max_items <= 100000 or not 0 < max_versions <= 500000):
         raise ValueError("invalid bounds")
     # Preflight all bounded tables before mutating the destination graph.
     # Otherwise a late versions overflow leaves partially imported items.
-    for table, limit, label in (("items", max_items, "item"),
+    for table, limit, label in (("sources", max_sources, "source"),
+                                ("items", max_items, "item"),
                                 ("versions", max_versions, "version")):
         count = db.execute(
             f"SELECT count(*) FROM {source_schema}.{table}").fetchone()[0]
