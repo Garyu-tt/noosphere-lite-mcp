@@ -6,15 +6,19 @@ on:
     paths:
       - "noosphere_lite/federation*.py"
       - "noosphere_lite/code_context_r05.py"
+      - "noosphere_lite/code_trace_r06.py"
       - "tests/test_federation*.py"
       - "tests/test_code_context_r05.py"
+      - "tests/test_code_trace_r06.py"
       - ".github/workflows/noosphere-evidence.yml"
   pull_request:
     paths:
       - "noosphere_lite/federation*.py"
       - "noosphere_lite/code_context_r05.py"
+      - "noosphere_lite/code_trace_r06.py"
       - "tests/test_federation*.py"
       - "tests/test_code_context_r05.py"
+      - "tests/test_code_trace_r06.py"
       - ".github/workflows/noosphere-evidence.yml"
 
 permissions:
@@ -36,3 +40,5 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_federation*.py' -v
       - name: Evidence-grounded CodeContext tests
         run: python -m unittest discover -s tests -p 'test_code_context_r05.py' -v
+      - name: Static CodeTrace bounded evidence tests
+        run: python -m unittest discover -s tests -p 'test_code_trace_r06.py' -v
