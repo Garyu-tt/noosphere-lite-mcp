@@ -13,6 +13,8 @@ def annotate_trace(trace: dict, trusted_projects: dict[str, str], *, max_bytes: 
     """Return a copy with per-function freshness evidence; no filesystem paths leaked."""
     if not isinstance(trace, dict) or not isinstance(trusted_projects, dict):
         raise TypeError('trace and trusted_projects must be dictionaries')
+    if 'root' in trace and trace['root'] is not None and not isinstance(trace['root'], dict):
+        raise ValueError('root must be a dictionary or None')
     functions = trace.get('functions', [])
     if not isinstance(functions, list) or any(not isinstance(f, dict) for f in functions):
         raise ValueError('functions must be a list of dictionaries')
