@@ -234,9 +234,10 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
         counts["call_candidates"]+=1
     # Fingerprint hubs scale linearly with function count (no clique expansion).
     for body_hash,nprojects in db.execute(
-        f"""SELECT body_hash,count(DISTINCT project)
-            FROM {source_schema}.twins
-            GROUP BY body_hash HAVING count(DISTINCT project)>1 ORDER BY body_hash"""):
+        f"""SELECT t.body_hash,count(DISTINCT t.project)
+            FROM {source_schema}.twins t
+            JOIN {source_schema}.funcs f ON f.id=t.func_id AND f.project=t.project
+            GROUP BY t.body_hash HAVING count(DISTINCT t.project)>1 ORDER BY t.body_hash"""):
         if not SHA256.fullmatch(str(body_hash)):continue
         hub="fed:body:"+str(body_hash)
         _node(db,hub,"semantic",str(body_hash),"ast_body_fingerprint",
@@ -244,7 +245,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
               "static_ast_fingerprint:"+str(body_hash))
         counts["body_hubs"]+=1
         for (fid,) in db.execute(
-            f"SELECT func_id FROM {source_schema}.twins WHERE body_hash=?",
+            f"""SELECT t.func_id FROM {source_schema}.twins t
+                JOIN {source_schema}.funcs f ON f.id=t.func_id AND f.project=t.project
+                WHERE t.body_hash=?""",
             (body_hash,)).fetchall():
             ident="fed:semantic:"+str(fid)
             if db.execute("SELECT 1 FROM nodes WHERE id=?",(ident,)).fetchone() is None:
