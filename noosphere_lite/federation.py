@@ -169,7 +169,8 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
 
 @atomic_graph_import
 def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
-                    max_functions: int = 50000, max_calls: int = 150000
+                    max_functions: int = 50000, max_calls: int = 150000,
+                    max_twins: int = 150000
                     ) -> dict[str,int]:
     """Attach AST function and cautiously resolved call candidates.
 
@@ -178,6 +179,7 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
     if not re.fullmatch(r"[a-z][a-z0-9_]*",source_schema):
         raise ValueError("invalid attached schema")
     if (type(max_functions) is not int or type(max_calls) is not int or
+            type(max_twins) is not int or not 0 < max_twins <= 500000 or
             not 0 < max_functions <= 100000 or not 0 < max_calls <= 500000):
         raise ValueError("invalid bounds")
     # Both bounds must pass before inserting any semantic nodes or edges.
@@ -186,6 +188,9 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
     ).fetchone()[0]
     if call_count > max_calls:
         raise ValueError("semantic call bound exceeded; refuse partial graph")
+    twin_count = db.execute(f"SELECT count(*) FROM {source_schema}.twins").fetchone()[0]
+    if twin_count > max_twins:
+        raise ValueError("semantic twin bound exceeded; refuse partial graph")
     count=db.execute(f"SELECT count(*) FROM {source_schema}.funcs").fetchone()[0]
     if count>max_functions:
         raise ValueError("semantic function bound exceeded; refuse partial graph")
