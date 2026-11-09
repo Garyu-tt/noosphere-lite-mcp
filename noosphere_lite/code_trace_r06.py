@@ -39,6 +39,7 @@ def _function(db: sqlite3.Connection, ident: str) -> dict | None:
     obj = dict(row)
     obj["ref"] = "fed:semantic:" + ident
     obj["truth_guaranteed"] = False
+    obj["indexed_source_status"] = obj["source_status"]
     obj["source_status"] = "static_ast_not_runtime_verified"
     return obj
 
@@ -54,9 +55,9 @@ def inspect_code(semantic_path: Path, ref: str, *,
     """
     if not isinstance(ref, str) or not ID.fullmatch(ref):
         raise ValueError("invalid semantic function reference")
-    if not isinstance(depth, int) or not (0 <= depth <= MAX_DEPTH):
+    if type(depth) is not int or not (0 <= depth <= MAX_DEPTH):
         raise ValueError("depth must be 0..3")
-    if not isinstance(limit, int) or not (1 <= limit <= MAX_NODES):
+    if type(limit) is not int or not (1 <= limit <= MAX_NODES):
         raise ValueError("limit must be 1..60")
     if not isinstance(include_incoming, bool):
         raise ValueError("include_incoming must be boolean")
