@@ -82,6 +82,18 @@ class FederationTests(unittest.TestCase):
         self.assertEqual(stats["body_hubs"],1)
         self.assertEqual(stats["body_candidates"],2)
         self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE dst='fed:body:"+self.sha2+"'").fetchone()[0],2)
+    def test_stale_call_site_digest_is_not_attached_to_new_source(self):
+        for fid in ('fn:a', 'fn:b'):
+            self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                            (fid,'proj-a','a.py',fid,'python',1,self.sha1,'parsed_ast'))
+        self.db.execute("INSERT INTO semantic.calls VALUES(?,?,?,?,?)",
+                        ('fn:a','fn:b','same_module_name_candidate',self.sha2,2))
+        self.db.execute("INSERT INTO semantic.calls VALUES(?,?,?,?,?)",
+                        ('fn:a','fn:b','same_module_name_candidate','invalid',3))
+        stats = import_semantic(self.db)
+        self.assertEqual(stats['call_candidates'], 0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE relation='static_call_candidate'").fetchone()[0], 0)
+
     def test_bounds_fail_closed(self):
         self.sample_live()
         with self.assertRaisesRegex(ValueError,"bound exceeded"):
