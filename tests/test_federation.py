@@ -82,6 +82,21 @@ class FederationTests(unittest.TestCase):
         self.assertEqual(stats["body_hubs"],1)
         self.assertEqual(stats["body_candidates"],2)
         self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE dst='fed:body:"+self.sha2+"'").fetchone()[0],2)
+    def test_twin_bound_rejects_before_writing(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:a','proj-a','a.py','a','python',1,self.sha1,'parsed_ast'))
+        for project in ('proj-a','proj-b'):
+            self.db.execute("INSERT INTO semantic.twins VALUES(?,?,?)",
+                            (self.sha2,'fn:a',project))
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(ValueError, "twin bound exceeded"):
+            import_semantic(self.db, max_twins=1)
+        self.assertEqual(before, self.db.execute("SELECT count(*) FROM nodes").fetchone()[0])
+
+    def test_boolean_twin_bound_rejected(self):
+        with self.assertRaisesRegex(ValueError, "invalid bounds"):
+            import_semantic(self.db, max_twins=True)
+
     def test_stale_call_site_digest_is_not_attached_to_new_source(self):
         for fid in ('fn:a', 'fn:b'):
             self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
