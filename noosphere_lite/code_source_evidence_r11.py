@@ -13,9 +13,12 @@ def annotate_trace(trace: dict, trusted_projects: dict[str, str], *, max_bytes: 
     """Return a copy with per-function freshness evidence; no filesystem paths leaked."""
     if not isinstance(trace, dict) or not isinstance(trusted_projects, dict):
         raise TypeError('trace and trusted_projects must be dictionaries')
+    functions = trace.get('functions', [])
+    if not isinstance(functions, list) or any(not isinstance(f, dict) for f in functions):
+        raise ValueError('functions must be a list of dictionaries')
     result = dict(trace)
     enriched = []
-    for function in trace.get('functions', []):
+    for function in functions:
         item = dict(function)
         project = item.get('project')
         path = item.get('path')
@@ -35,7 +38,13 @@ def annotate_trace(trace: dict, trusted_projects: dict[str, str], *, max_bytes: 
     result['functions'] = enriched
     if isinstance(trace.get('root'), dict):
         root_ref = trace['root'].get('ref')
-        result['root'] = next((x for x in enriched if x.get('ref') == root_ref), dict(trace['root']))
+        matching = next((x for x in enriched if root_ref is not None and x.get('ref') == root_ref), None)
+        # A root omitted from the bounded function list still needs evidence.
+        # Never silently return an unannotated root as if it were checked.
+        if matching is None:
+            matching = annotate_trace({'functions': [trace['root']]}, trusted_projects,
+                                      max_bytes=max_bytes)['functions'][0]
+        result['root'] = matching
     result['runtime_verified'] = False
     result['source_freshness_policy'] = 'trusted_project_roots_only; static evidence; fail closed'
     return result
