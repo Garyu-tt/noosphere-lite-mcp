@@ -2,7 +2,7 @@
 import sqlite3
 import unittest
 
-from noosphere_lite.federation import import_live, import_semantic, stable_id, explain_candidate
+from federation import import_live, import_semantic, stable_id, explain_candidate
 
 class FederationTests(unittest.TestCase):
     def setUp(self):
@@ -88,6 +88,27 @@ class FederationTests(unittest.TestCase):
             import_live(self.db,max_items=1,max_versions=1)
         with self.assertRaisesRegex(ValueError,"invalid attached schema"):
             import_live(self.db,source_schema="live;DROP TABLE nodes")
+    def test_late_version_overflow_is_atomic(self):
+        self.sample_live()
+        before = (self.db.execute("SELECT count(*) FROM nodes").fetchone()[0],
+                  self.db.execute("SELECT count(*) FROM edges").fetchone()[0])
+        with self.assertRaisesRegex(ValueError, "version bound exceeded"):
+            import_live(self.db, max_versions=1)
+        after = (self.db.execute("SELECT count(*) FROM nodes").fetchone()[0],
+                 self.db.execute("SELECT count(*) FROM edges").fetchone()[0])
+        self.assertEqual(before, after)
+
+    def test_late_call_overflow_is_atomic(self):
+        self.db.execute("INSERT INTO semantic.funcs VALUES(?,?,?,?,?,?,?,?)",
+                        ('fn:sample','proj-a','a.py','f','python',1,self.sha1,'parsed_ast'))
+        for i in range(2):
+            self.db.execute("INSERT INTO semantic.calls VALUES(?,?,?,?,?)",
+                            ('fn:sample','fn:sample','candidate',self.sha1,i))
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(ValueError, "call bound exceeded"):
+            import_semantic(self.db, max_calls=1)
+        self.assertEqual(before, self.db.execute("SELECT count(*) FROM nodes").fetchone()[0])
+
     def test_no_injection_in_labels(self):
         self.db.execute("INSERT INTO live.sources VALUES('abc','webpage','<script>alert(1)</script>','https://example.org','today')")
         import_live(self.db)
