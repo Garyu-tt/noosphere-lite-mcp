@@ -1,0 +1,55 @@
+name: Noosphere knowledge-evolution and Ladybug checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "noosphere_lite/vault.py"
+      - "noosphere_lite/knowledge_evolution.py"
+      - "noosphere_lite/ladybug_projection.py"
+      - "noosphere_lite/mcp_server.py"
+      - "tests/test_knowledge_evolution.py"
+      - "tests/test_ladybug_projection.py"
+      - "pyproject.toml"
+      - ".github/workflows/noosphere-knowledge.yml"
+  pull_request:
+    paths:
+      - "noosphere_lite/vault.py"
+      - "noosphere_lite/knowledge_evolution.py"
+      - "noosphere_lite/ladybug_projection.py"
+      - "noosphere_lite/mcp_server.py"
+      - "tests/test_knowledge_evolution.py"
+      - "tests/test_ladybug_projection.py"
+      - "pyproject.toml"
+      - ".github/workflows/noosphere-knowledge.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  knowledge-evolution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+        ladybug: [false, true]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install core and optional Ladybug
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.ladybug }}" = "true" ]; then
+            python -m pip install -e '.[ladybug]'
+          else
+            python -m pip install -e .
+          fi
+      - name: Verify full test suite
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/noosphere_lite
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
