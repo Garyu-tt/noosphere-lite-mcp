@@ -23,10 +23,14 @@ def run(vault: MemoryVault):
                    kind: str = "note", source: str = "",
                    valid_from: str | None = None,
                    valid_to: str | None = None,
-                   observed_at: str | None = None) -> dict:
-        """Persist dated memory: recorded_at is automatic; validity is explicitly sourced."""
+                   observed_at: str | None = None,
+                   epistemic_status: str = "unreviewed",
+                   intent: str = "", evidence_ref: str = "") -> dict:
+        """Persist a claim with its explicitly unverified epistemic metadata."""
         return vault.add(title, body, tags, kind, source,
-                         valid_from=valid_from, valid_to=valid_to, observed_at=observed_at)
+                         valid_from=valid_from, valid_to=valid_to, observed_at=observed_at,
+                         epistemic_status=epistemic_status, intent=intent,
+                         evidence_ref=evidence_ref)
 
     @app.tool()
     def memory_search(query: str, limit: int = 10,
@@ -50,14 +54,35 @@ def run(vault: MemoryVault):
         return vault.read(memory_id)
 
     @app.tool()
-    def memory_link(source_id: str, target_id: str, relation: str = "related") -> dict:
-        """Add a typed, directed connection between two memories."""
-        return vault.link(source_id, target_id, relation)
+    def memory_link(source_id: str, target_id: str, relation: str = "related",
+                    epistemic_status: str = "unreviewed",
+                    evidence_ref: str = "", intent: str = "",
+                    origin: str = "") -> dict:
+        """Add a directed relation with explicitly unverified provenance metadata."""
+        return vault.link(source_id, target_id, relation,
+                          epistemic_status=epistemic_status,
+                          evidence_ref=evidence_ref, intent=intent, origin=origin)
 
     @app.tool()
     def memory_unlink(source_id: str, target_id: str, relation: str = "related") -> dict:
         """Remove a connection without deleting either memory."""
         return vault.unlink(source_id, target_id, relation)
+
+    @app.tool()
+    def memory_enrichment_gate(memory_id: str) -> dict:
+        """Check the author-owned region, without re-triggering machine output."""
+        return vault.enrichment_gate(memory_id)
+
+    @app.tool()
+    def memory_enrich(memory_id: str, content: str,
+                      expected_author_hash: str) -> dict:
+        """Store an AI-owned enrichment after a hash-based concurrency gate."""
+        return vault.enrich(memory_id, content, expected_author_hash)
+
+    @app.tool()
+    def memory_graph_projection(limit: int = 200) -> dict:
+        """Build bounded in-memory graph projection; not verified evidence."""
+        return vault.graph_projection(limit)
 
     @app.tool()
     def memory_neighborhood(memory_id: str, depth: int = 1, limit: int = 100) -> dict:
@@ -173,9 +198,15 @@ def run(vault: MemoryVault):
         return briefings.by_source(project, source_ref,
                                    limit=limit, max_chars=max_chars)
 
+    # Ladybug graph stays strictly in-memory and is rebuilt from the vault.
+    # No extra plaintext files or live dual-write timing assumptions.
+    import os
+    if os.environ.get("NSL_LADYBUG_EPHEMERAL") == "1":
+        from .ladybug_projection import register_mcp_tools
+        register_mcp_tools(app, vault)
+
     # Explicit opt-in: peer registry is private local cached metadata, never
     # a default network crawler or a trusted source of executable instructions.
-    import os
     peer_db = os.environ.get("NSL_PEER_DB")
     if peer_db:
         import sqlite3
