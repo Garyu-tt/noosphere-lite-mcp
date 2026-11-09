@@ -91,7 +91,8 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*",source_schema):
         raise ValueError("invalid attached schema")
-    if not 0 < max_items <= 100000 or not 0 < max_versions <= 500000:
+    if (type(max_items) is not int or type(max_versions) is not int or
+            not 0 < max_items <= 100000 or not 0 < max_versions <= 500000):
         raise ValueError("invalid bounds")
     # Preflight all bounded tables before mutating the destination graph.
     # Otherwise a late versions overflow leaves partially imported items.
@@ -173,7 +174,8 @@ def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*",source_schema):
         raise ValueError("invalid attached schema")
-    if not 0 < max_functions <= 100000 or not 0 < max_calls <= 500000:
+    if (type(max_functions) is not int or type(max_calls) is not int or
+            not 0 < max_functions <= 100000 or not 0 < max_calls <= 500000):
         raise ValueError("invalid bounds")
     # Both bounds must pass before inserting any semantic nodes or edges.
     call_count = db.execute(
