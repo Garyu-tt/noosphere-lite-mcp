@@ -94,6 +94,19 @@ class FederationTests(unittest.TestCase):
         self.assertEqual(stats['call_candidates'], 0)
         self.assertEqual(self.db.execute("SELECT count(*) FROM edges WHERE relation='static_call_candidate'").fetchone()[0], 0)
 
+    def test_source_bound_prevents_partial_graph(self):
+        self.sample_live()
+        self.db.execute("INSERT INTO live.sources VALUES('another','rss','Another','https://example.org','2026-11-09')")
+        before = self.db.execute("SELECT count(*) FROM nodes").fetchone()[0]
+        with self.assertRaisesRegex(ValueError, "source bound exceeded"):
+            import_live(self.db, max_sources=1)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM nodes").fetchone()[0], before)
+
+    def test_boolean_source_bound_rejected(self):
+        self.sample_live()
+        with self.assertRaisesRegex(ValueError, "invalid bounds"):
+            import_live(self.db, max_sources=True)
+
     def test_bounds_fail_closed(self):
         self.sample_live()
         with self.assertRaisesRegex(ValueError,"bound exceeded"):
