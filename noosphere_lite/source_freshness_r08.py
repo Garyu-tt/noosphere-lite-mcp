@@ -75,6 +75,11 @@ def classify_trusted_file(indexed_sha256: str | None, trusted_root: str,
                         data.extend(chunk)
                     if len(data) > max_bytes:
                         return classify_source(indexed_sha256, None, observed_at=observed_at)
+                    # A writer may change the file while it is being hashed.
+                    # Never report a match for an observed concurrent mutation.
+                    after = os.fstat(fd)
+                    if (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns) != (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns) or len(data) != after.st_size:
+                        return classify_source(indexed_sha256, None, observed_at=observed_at)
                     return classify_source(indexed_sha256, bytes(data), observed_at=observed_at)
                 finally:
                     os.close(fd)
