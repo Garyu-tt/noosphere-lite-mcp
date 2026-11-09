@@ -8,6 +8,8 @@ indexed code. The caller controls source permissions, DB attaches and publicatio
 from __future__ import annotations
 
 import hashlib
+import functools
+import itertools
 import re
 import sqlite3
 from typing import Any
@@ -61,6 +63,25 @@ def _aliases(title: str) -> tuple[str, ...]:
             hits.append(capability)
     return tuple(hits)
 
+_savepoint_ids = itertools.count()
+
+def atomic_graph_import(func):
+    """Rollback only this import's writes, preserving the caller's transaction."""
+    @functools.wraps(func)
+    def wrapped(db, *args, **kwargs):
+        name = f"noosphere_import_{next(_savepoint_ids)}"
+        db.execute(f"SAVEPOINT {name}")
+        try:
+            result = func(db, *args, **kwargs)
+        except BaseException:
+            db.execute(f"ROLLBACK TO SAVEPOINT {name}")
+            db.execute(f"RELEASE SAVEPOINT {name}")
+            raise
+        db.execute(f"RELEASE SAVEPOINT {name}")
+        return result
+    return wrapped
+
+@atomic_graph_import
 def import_live(db: sqlite3.Connection, source_schema: str = "live",
                 max_items: int = 30000, max_versions: int = 80000) -> dict[str,int]:
     """Import external observations without claiming correctness.
@@ -142,6 +163,7 @@ def import_live(db: sqlite3.Connection, source_schema: str = "live",
         counts["versions"]+=1
     return counts
 
+@atomic_graph_import
 def import_semantic(db: sqlite3.Connection, source_schema: str = "semantic",
                     max_functions: int = 50000, max_calls: int = 150000
                     ) -> dict[str,int]:
